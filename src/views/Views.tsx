@@ -1,8 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import ElementRenderer from 'servlygroup/lib/RenderElements';
-import type { LayoutType } from '@/@types/theme';
+import { Suspense } from 'react';
 
 const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
 
