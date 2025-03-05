@@ -1,0 +1,6 @@
+@import './generated-fonts.css';
+
+/* Add any additional font-related styles here */
+.font-loading {
+  font-display: swap;
+}

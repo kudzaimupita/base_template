@@ -1,0 +1,369 @@
+/* Import statements */
+@import "./assets/styles/app.css";
+@import "./generated-fonts.css";
+
+/* Font imports grouped by type */
+
+/* Base Variables */
+:root {
+  --primary-blue: rgb(37 99 235);
+  --border-color: #dedede;
+  --text-dark: #333;
+  --bg-light: #f5f5f5;
+  --transition-default: all 0.2s ease;
+}
+
+/* Zoom Classes */
+.zoomed5 {
+  zoom: 15%;
+}
+
+.zoomedNormal {
+  zoom: 130%;
+}
+
+.zoomed6 {
+  zoom: 87%;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 0.5em;
+  height: 0.5em;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ant Design Custom Styles */
+.ant-form-item {
+  margin-bottom: 0px;
+}
+
+.ant-form-item-label {
+  margin: 0px;
+  padding: 0px;
+  font-size: larger;
+}
+
+.ant-col.ant-form-item-label {
+  font-size: larger;
+  margin: 0px;
+  padding: 0px;
+  zoom: 78%;
+}
+
+.ant-descriptions-header {
+  margin: 0%;
+  padding: 0%;
+}
+
+.ant-collapse-no-padding .ant-collapse-header {
+  padding: 2px 4px !important;
+}
+
+.ant-collapse-no-padding .ant-collapse-content-box {
+  padding: 0 !important;
+  margin: 0 !important;
+  background-color: transparent;
+}
+
+
+.field-object {
+  border: 1px solid #d1d5db;  /* equivalent to border-gray-300 */
+  border-radius: 0.25rem;     /* equivalent to rounded */
+  margin-top: 0.5rem;         /* equivalent to mt-2 */
+  margin-bottom: 0.5rem;      /* equivalent to mb-2 */
+  padding: 0.5rem;            /* equivalent to p-2 */
+}
+.custom-table .ant-table-thead > tr > th {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.custom-table .ant-table-thead > tr > th:hover {
+  background-color: #e0e0e0;
+}
+
+.hide-field-description .field-description {
+  display: none !important;
+}
+
+.ant-input-outlined,
+.ant-select-selector {
+  background-color: transparent !important;
+}
+
+/* Buttons */
+.servly-primary-button {
+  background-color: var(--primary-blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.servly-secondary-blue-button {
+  color: var(--primary-blue);
+  border: 1.5px solid var(--primary-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 13px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.servly-secondary-button {
+  color: var(--text-dark);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* Dark Mode Styles */
+.dark .field-object {
+  border-color: #383838;
+}
+
+.dark .ant-input,
+.dark .field-object .ant-input,
+.dark .field-object input[type="text"],
+.dark .field-object input[type="number"],
+.dark .field-object .ant-input-affix-wrapper .ant-input {
+  background-color: transparent !important;
+}
+
+.dark .ant-form-item-additional {
+  display: none !important;
+}
+
+/* Form Styles */
+.two-column-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.two-column-form .ant-form-item,
+.two-column-form fieldset {
+  grid-column: span 1;
+}
+
+.two-column-form .meta {
+  grid-column: span 2;
+}
+
+.ant-form-item-label label {
+  font-size: 9px;
+  color: var(--text-dark);
+}
+
+
+
+/* Animation */
+@keyframes scaleFade {
+  from {
+    transform: scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+
+
+.custom-drag-area {
+  opacity: 0.8 !important;
+  animation: scaleFade 0.2s ease-out;
+}
+
+.builderBg {
+  background-image: repeating-linear-gradient(#696969 0 1px, transparent 1px 90%),
+    repeating-linear-gradient(90deg, #373737 0 1px, transparent 1px 90%);
+  background-size: 5px 5px;
+}
+
+.builderBgOg {
+  background-image: radial-gradient(circle, #ccc 1px, transparent 1px);
+  background-size: 5px 5px;
+}
+
+
+.selecto-selection {
+  display: none !important;
+  transform: scale(0.4);
+  transform-origin: 0 0; /* Adjust as needed */
+}
+/* Reset the flex layout to default behavior */
+.ant-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+/* Make the form field container take full width */
+.form-group.field, 
+.ant-col[style*="flex: 1"] {
+  width: 100% !important;
+  flex: 1 0 100% !important;
+}
+
+/* Style the button container to appear below the field */
+.ant-col[style*="flex: 0 0 192px"] {
+  width: 100% !important;
+  flex: 0 0 100% !important;
+  margin-top: 10px;
+}
+
+/* Make buttons smaller and centered */
+.ant-btn-group {
+  display: flex;
+  justify-content: center;
+  width: auto !important;
+}
+
+.ant-btn-group button {
+  width: 40px !important;
+}
+.sqd-designer {
+	position: relative;
+	display: flex;
+	/* width: 100%; */
+  /* background: transparent; */
+	height: 90vh;
+}
+.moveable-control-box {
+  border: none !important;
+  outline: none !important;
+}
+.small-tree-select .ant-select-tree-node-content-wrapper {
+  font-size: 12px; /* You can adjust this value */
+  line-height: 1.2;
+}
+
+/* Make the parent node text small as well */
+.small-tree-select .ant-select-selection-item {
+  font-size: 12px;
+}
+
+/* Optional: Adjust the spacing between items */
+.small-tree-select .ant-select-tree-treenode {
+  padding: 2px 0;
+}
+
+/* Add these CSS rules */
+.ant-table {
+  border-radius: 0 !important;
+}
+
+.ant-table-container {
+  border-radius: 0 !important;
+}
+
+.ant-table-content {
+  border-radius: 0 !important;
+}
+
+.ant-table-wrapper {
+  border-radius: 0 !important;
+}
+
+.ant-table table {
+  border-radius: 0 !important;
+}
+
+.ant-table-title {
+  border-radius: 0 !important;
+}
+
+.ant-table-footer {
+  border-radius: 0 !important;
+}
+
+.ant-table-thead > tr:first-child > th:first-child {
+  border-top-left-radius: 0 !important;
+}
+
+.ant-table-thead > tr:first-child > th:last-child {
+  border-top-right-radius: 0 !important;
+}
+
+.ant-table-tbody > tr:last-child > td:first-child {
+  border-bottom-left-radius: 0 !important;
+}
+
+.ant-table-tbody > tr:last-child > td:last-child {
+  border-bottom-right-radius: 0 !important;
+}/* Add these CSS rules */
+.ant-table {
+  border-radius: 0 !important;
+}
+
+.ant-table-container {
+  border-radius: 0 !important;
+}
+
+.ant-table-content {
+  border-radius: 0 !important;
+}
+
+.ant-table-wrapper {
+  border-radius: 0 !important;
+}
+
+.ant-table table {
+  border-radius: 0 !important;
+}
+
+.ant-table-title {
+  border-radius: 0 !important;
+}
+
+.ant-table-footer {
+  border-radius: 0 !important;
+}
+
+.ant-table-thead > tr:first-child > th:first-child {
+  border-top-left-radius: 0 !important;
+}
+
+.ant-table-thead > tr:first-child > th:last-child {
+  border-top-right-radius: 0 !important;
+}
+
+.ant-table-tbody > tr:last-child > td:first-child {
+  border-bottom-left-radius: 0 !important;
+}
+
+.ant-table-tbody > tr:last-child > td:last-child {
+  border-bottom-right-radius: 0 !important;
+}
