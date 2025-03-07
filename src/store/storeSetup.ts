@@ -10,10 +10,10 @@ import storage from 'redux-persist/lib/storage';
 const middlewares: any[] = [];
 
 const persistConfig = {
-  key: 'servly',
+  key: 'PERSIST_STORE_NAME',
   keyPrefix: '',
   storage,
-  whitelist: [''],
+  whitelist: ['auth', 'locale', 'appStatePersisted'],
 };
 
 interface CustomStore extends Store<RootState, AnyAction> {

@@ -1,18 +1,24 @@
 import { AnyAction, CombinedState, Reducer, combineReducers } from 'redux';
+import auth, { AuthState } from './slices/auth';
+import base, { BaseState } from './slices/base';
+import dragAndDropReducer, { DragAndDropState } from './slices/builder/dragAndDropSlice';
+import locale, { LocaleState } from './slices/locale/localeSlice';
 
+import appPersistedState from './slices/appStatePersisted/appStateSlice';
 import appState from './slices/appState/appState';
+import currentAppState from './slices/currentApp/currentAppState';
 
-// import auth, { AuthState } from './slices/auth';
-// import base, { BaseState } from './slices/base';
-// import locale, { LocaleState } from './slices/locale/localeSlice';
 // import theme, { ThemeState } from './slices/theme/themeSlice';
-// import dragAndDropReducer, { DragAndDropState } from './slices/builder/dragAndDropSlice';
 
-// import appPersistedState from './slices/appStatePersisted/appStateSlice';
-
-// import currentAppState from './slices/currentApp/currentAppState';
+// import RtkQueryService from '@/services/RtkQueryService';
 
 export type RootState = CombinedState<{
+  auth: CombinedState<AuthState>;
+  base: CombinedState<BaseState>;
+  locale: LocaleState;
+  // theme: ThemeState;
+  dragAndDrop: DragAndDropState;
+
   /* eslint-disable @typescript-eslint/no-explicit-any */
 }>;
 
@@ -21,7 +27,15 @@ export interface AsyncReducers {
 }
 
 const staticReducers = {
+  auth,
+  base,
+  locale,
+  // theme,
+  dragAndDrop: dragAndDropReducer,
   appState: appState,
+  appPersistedState,
+  currentAppState,
+  // [RtkQueryService.reducerPath]: RtkQueryService.reducer,
 };
 
 const rootReducer = (asyncReducers?: AsyncReducers) => (state: RootState, action: AnyAction) => {

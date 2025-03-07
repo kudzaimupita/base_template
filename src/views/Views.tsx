@@ -1,9 +1,9 @@
 import { Route, Routes, useNavigate } from 'react-router-dom';
+import store, { setDestroyInfo, setSessionInfo } from '@/store';
 
 import ElementRenderer from '../lib/RenderElements';
 import { Suspense } from 'react';
-import appConfig from '../../appConfig.json'
-import store from '@/store';
+import appConfig from '../../appConfig.json';
 import { storeInvocation } from '@/services/invocationService';
 
 // const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
@@ -42,8 +42,8 @@ const Views = () => {
                     // builderCursorMode={builderCursorMode}
                     store={store}
                     // refreshAppAuth={refreshAppAuth}
-                    // setDestroyInfo={setDestroyInfo}
-                    // setSessionInfo={setSessionInfn}
+                    setDestroyInfo={setDestroyInfo}
+                    setSessionInfo={setSessionInfo}
                     storeInvocation={storeInvocation}
                   />
                   rtfgtrg
@@ -77,8 +77,8 @@ const Views = () => {
                 // builderCursorMode={builderCursorMode}
                 store={store}
                 // refreshAppAuth={refreshAppAuth}
-                // setDestroyInfo={setDestroyInfo}
-                // setSessionInfo={setSessionInfo}
+                setDestroyInfo={setDestroyInfo}
+                setSessionInfo={setSessionInfo}
                 storeInvocation={storeInvocation}
               />
               {/* {appConfig?.views?.[0]?.name} */}
