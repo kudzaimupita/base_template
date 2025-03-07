@@ -2,10 +2,11 @@ import { Route, Routes, useNavigate } from 'react-router-dom';
 
 import ElementRenderer from '../lib/RenderElements';
 import { Suspense } from 'react';
+import appConfig from '../../appConfig.json'
 import store from '@/store';
 import { storeInvocation } from '@/services/invocationService';
 
-const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
+// const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
 
 const Views = () => {
   // const navigate = useNavigate();
