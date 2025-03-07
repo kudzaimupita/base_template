@@ -1,11 +1,14 @@
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useNavigate } from 'react-router-dom';
 
-import ElementRenderer from 'servlygroup/lib/RenderElements';
+import ElementRenderer from '../lib/RenderElements';
 import { Suspense } from 'react';
+import store from '@/store';
+import { storeInvocation } from '@/services/invocationService';
 
 const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
 
 const Views = () => {
+  // const navigate = useNavigate();
   return (
     <Suspense fallback={<div className="flex flex-auto flex-col h-[100vh]">{/* <ModernSpinner /> */}</div>}>
       <Routes>
@@ -19,15 +22,15 @@ const Views = () => {
                 <div className="w-[auto] bg-white">
                   {' '}
                   <ElementRenderer
-                    // setAppStatePartial={setAppStatePartial}
+                    setAppStatePartial={() => ''}
                     parentStyle={route?.style || {}}
                     // propsData={propsData}
                     // propsData={propsData}
                     targets={[]}
-                    // dispatch={dispatch}
+                    dispatch={() => ''}
                     elements={route?.layout}
                     readOnly={false}
-                    tab={appConfig?.views?.[0]?.id}
+                    tab={route?.id}
                     // navigate={navigate}
                     appState={{}}
                     parentId={null}
@@ -36,18 +39,51 @@ const Views = () => {
                     // isDragging={isDragging}
                     currentApplication={appConfig}
                     // builderCursorMode={builderCursorMode}
-                    // store={store}
+                    store={store}
                     // refreshAppAuth={refreshAppAuth}
                     // setDestroyInfo={setDestroyInfo}
-                    // setSessionInfo={setSessionInfo}
-                    // storeInvocation={storeInvocation}
+                    // setSessionInfo={setSessionInfn}
+                    storeInvocation={storeInvocation}
                   />
                   rtfgtrg
                 </div>
               }
             />
           );
-        })}
+        })}{' '}
+        <Route
+          path="/"
+          element={
+            <>
+              <ElementRenderer
+                // setAppStatePartial={setAppStatePartial}
+                // parentStyle={}
+                parentStyle={appConfig?.views?.[0]?.style}
+                // propsData={propsData}
+                // propsData={propsData}
+                targets={[]}
+                // dispatch={useDispatch()}
+                elements={appConfig?.views?.[0]?.layout}
+                readOnly={false}
+                tab={appConfig?.views?.[0]?.id}
+                // navigate={navigate}
+                appState={{}}
+                parentId={null}
+                editMode={false}
+                // setSelectedElements={setSelectedTargets}
+                // isDragging={isDragging}
+                currentApplication={appConfig}
+                // builderCursorMode={builderCursorMode}
+                store={store}
+                // refreshAppAuth={refreshAppAuth}
+                // setDestroyInfo={setDestroyInfo}
+                // setSessionInfo={setSessionInfo}
+                storeInvocation={storeInvocation}
+              />
+              {/* {appConfig?.views?.[0]?.name} */}
+            </>
+          }
+        />
       </Routes>
     </Suspense>
   );

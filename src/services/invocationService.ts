@@ -1,45 +1,5 @@
 import { del, get, patch, post, post2 } from './api_helper_client';
 
-import ApiService from './GenericApiService';
-
-export const getInvocations = () => {
-  return new Promise((resolve, reject) => {
-    get(`/invocations`)
-      .then((data) => resolve(data))
-      .catch((error) => reject(error));
-  });
-};
-
-export const getSettings = () => {
-  return new Promise((resolve, reject) => {
-    get(`/invocations/settings`)
-      .then((data) => resolve(data))
-      .catch((error) => reject(error));
-  });
-};
-
-export async function getInvocation(id: any) {
-  return ApiService.fetchData({
-    url: `/invocations/${id}`,
-    method: 'get',
-  });
-}
-export const checkout = (body: any) => {
-  return new Promise((resolve, reject) => {
-    post(`/invocations/checkout`, body)
-      .then((data) => resolve(data))
-      .catch((error) => reject(error));
-  });
-};
-
-export const updateSubscription = (body: any) => {
-  return new Promise((resolve, reject) => {
-    post(`/invocations/updateSubscription`, body)
-      .then((data) => resolve(data))
-      .catch((error) => reject(error));
-  });
-};
-
 export const storeInvocation = (formData, appId, controllerId, component, view, headers): any => {
   return new Promise((resolve, reject) => {
     return post2(`/invocations/${appId}/${controllerId}?component=${component}&view=${view}`, formData, {
@@ -118,22 +78,6 @@ export const deleteInvocation = (id: any) => {
       .catch((error) => reject(error));
   });
 };
-
-export async function getNewInvocations(params: any) {
-  return ApiService.fetchData({
-    url: '/invocations',
-    method: 'get',
-    params,
-  });
-}
-
-// export async function getSettings(params: any) {
-//     return ApiService.fetchData({
-//         url: '/invocations/settings',
-//         method: 'get',
-//         params,
-//     })
-// }
 
 export const deleteInvocations = (formData: any) => {
   return new Promise((resolve, reject) => {
