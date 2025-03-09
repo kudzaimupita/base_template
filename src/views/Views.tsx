@@ -93,7 +93,11 @@ const Views = () => {
               key={`${route.id}`}
               path={`/${route.id}`}
               element={
-                <ScaleContainer className="w-[auto] bg-white">
+                <ScaleContainer
+                  designWidth={route?.configuration?.deviceScreen?.size?.width}
+                  designHeight={route?.configuration?.deviceScreen?.size?.height}
+                  className="w-[auto] bg-white"
+                >
                   {' '}
                   <ElementRenderer
                     setAppStatePartial={() => ''}

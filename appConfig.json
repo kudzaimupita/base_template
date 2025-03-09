@@ -9515,9 +9515,9 @@
             "backgroundSize": "cover"
           },
           "style": {
-            "transform": "translate(525px, 15px)",
-            "width": "810px",
-            "height": "325px",
+            "transform": "translate(685px, 85px)",
+            "width": "465px",
+            "height": "160px",
             "left": "0",
             "top": "0",
             "zIndex": 1
@@ -9982,92 +9982,6 @@
         {
           "isGroup": true,
           "componentId": "container",
-          "i": "container-1740056200185",
-          "name": "Default-1203",
-          "children": [],
-          "parent": null,
-          "isChild": false,
-          "configuration": {
-            "lineHeight": 1,
-            "overflowX": "visible",
-            "overflowY": "visible",
-            "cursor": "Default",
-            "position": "absolute",
-            "iconColor": "#ddd",
-            "fontColor": "#ddd",
-            "fontSize": "16px",
-            "zIndex": 1,
-            "borderColor": "#ddd",
-            "background": "rgba(68, 136, 213, 1)",
-            "tag": "div",
-            "backgroundImage": "url(null)",
-            "outlineStyle": "none",
-            "width": 200,
-            "height": 200,
-            "opacity": 1,
-            "boxShadow": " ",
-            "filter": " ",
-            "display": "flex",
-            "autoAlign": false,
-            "backgroundType": "color",
-            "animations": [],
-            "_overrides_": []
-          },
-          "style": {
-            "transform": "translate(950px, 820px)",
-            "width": "230px",
-            "height": "50px",
-            "left": "0",
-            "top": "0",
-            "zIndex": 1
-          }
-        },
-        {
-          "isGroup": true,
-          "componentId": "container",
-          "i": "1740056263451-0",
-          "name": "Default-1203-copy",
-          "children": [],
-          "parent": null,
-          "isChild": false,
-          "configuration": {
-            "lineHeight": 1,
-            "overflowX": "visible",
-            "overflowY": "visible",
-            "cursor": "Default",
-            "position": "absolute",
-            "iconColor": "#ddd",
-            "fontColor": "#ddd",
-            "fontSize": "16px",
-            "zIndex": 1,
-            "borderColor": "#ddd",
-            "background": "rgba(0, 55, 119, 1)",
-            "tag": "div",
-            "backgroundImage": "url(null)",
-            "outlineStyle": "none",
-            "width": 200,
-            "height": 200,
-            "opacity": 1,
-            "boxShadow": " ",
-            "filter": " ",
-            "display": "flex",
-            "autoAlign": false,
-            "backgroundType": "color",
-            "animations": [],
-            "_overrides_": []
-          },
-          "style": {
-            "transform": "translate(710px, 820px)",
-            "width": "240px",
-            "height": "70px",
-            "left": "0",
-            "top": "0",
-            "zIndex": 1
-          }
-        },
-        {
-          "isGroup": true,
-          "componentId": "container",
           "i": "container-1740687906050",
           "name": "Default-4157",
           "children": [],
@@ -10095,72 +10009,6 @@
             "left": "0",
             "top": "0",
             "zIndex": 1
-          }
-        },
-        {
-          "isGroup": false,
-          "componentId": "text",
-          "i": "container-1740687915005",
-          "name": "Text-9829",
-          "children": [],
-          "parent": "container-1740687909808",
-          "isChild": true,
-          "configuration": {
-            "lineHeight": 1,
-            "overflowX": "visible",
-            "overflowY": "visible",
-            "cursor": "Default",
-            "position": "absolute",
-            "iconColor": "#ddd",
-            "fontColor": "#ddd",
-            "fontSize": "16px",
-            "zIndex": 3
-          },
-          "style": {
-            "transform": "translate(172.68753051757812px, 106.62498474121094px)",
-            "width": "80px",
-            "height": "27px",
-            "left": "0",
-            "top": "0",
-            "zIndex": 2
-          }
-        },
-        {
-          "isGroup": false,
-          "componentId": "icon",
-          "i": "container-1740688050189",
-          "name": "Icon-7729",
-          "children": [],
-          "parent": "container-1740687909808",
-          "isChild": true,
-          "configuration": {
-            "lineHeight": 1,
-            "overflowX": "visible",
-            "overflowY": "visible",
-            "cursor": "Default",
-            "position": "absolute",
-            "iconColor": "rgb(138, 71, 71)",
-            "fontColor": "#ddd",
-            "zIndex": 3,
-            "&:hover": {
-              "boxShadow": " "
-            },
-            "display": "flex",
-            "boxShadow": " ",
-            "filter": " ",
-            "fontWeight": null,
-            "textDecoration": "none",
-            "backgroundType": "color",
-            "iconColorOpacity": 1,
-            "_overrides_": []
-          },
-          "style": {
-            "transform": "translate(125.18753051757812px, 176.62498474121094px)",
-            "width": "30px",
-            "height": "30px",
-            "left": "0",
-            "top": "0",
-            "zIndex": 2
           }
         }
       ],
@@ -13541,7 +13389,7 @@
     "edge_draggable": true
   },
   "company": "6594497b0b9185ef9fbd53db",
-  "currentVersion": "4.0.6",
+  "currentVersion": "4.2.0",
   "status": "active",
   "layoutSettings": {
     "logo": "",
@@ -13809,15 +13657,15 @@
     }
   ],
   "createdAt": "2025-02-12T17:40:51.287Z",
-  "updatedAt": "2025-03-09T16:09:51.367Z",
+  "updatedAt": "2025-03-09T17:33:20.656Z",
   "meta": {
     "s3Bucket": "servly-app-67acdd23eeb4de8dd39ceafb",
-    "cloudFrontDomain": "d3e3al697pz1y8.cloudfront.net",
-    "websiteUrl": "https://d3e3al697pz1y8.cloudfront.net",
-    "cloudFrontId": "E2NXJKDPJCXGL1",
+    "cloudFrontDomain": "d2i8z6pstcq4sa.cloudfront.net",
+    "websiteUrl": "https://d2i8z6pstcq4sa.cloudfront.net",
+    "cloudFrontId": "E261OHITN6V7B0",
     "bucketUrl": "http://servly-app-67acdd23eeb4de8dd39ceafb.s3-website-us-east-1.amazonaws.com/"
   },
-  "lastDeployment": "2025-03-09T15:01:22.817Z",
+  "lastDeployment": "2025-03-09T17:17:06.370Z",
   "isDeploying": false,
   "id": "67acdd23eeb4de8dd39ceafb"
 }
