@@ -123,7 +123,6 @@ const Views = () => {
                     setSessionInfo={setSessionInfo}
                     storeInvocation={storeInvocation}
                   />
-                  rtfgtrg
                 </ScaleContainer>
               }
             />
