@@ -1,11 +1,11 @@
 {
-  "domainConfig": {
-    "secondary": []
-  },
   "_id": "67acdd23eeb4de8dd39ceafb",
   "type": "web",
   "name": "proof_of_concepts",
   "description": "teset",
+  "domainConfig": {
+    "secondary": []
+  },
   "views": [
     {
       "name": "contender list page",
@@ -9617,8 +9617,8 @@
           "i": "1740054806864-0",
           "name": "Default-9647-copy-copy",
           "children": [],
-          "parent": null,
-          "isChild": false,
+          "parent": "container-1741543196805",
+          "isChild": true,
           "configuration": {
             "lineHeight": 1,
             "overflowX": "visible",
@@ -9628,7 +9628,7 @@
             "iconColor": "#ddd",
             "fontColor": "#ddd",
             "fontSize": "16px",
-            "zIndex": 1,
+            "zIndex": 2,
             "borderColor": "#ddd",
             "background": "#eeeeee",
             "tag": "input",
@@ -9648,10 +9648,16 @@
               "preventDefault": false,
               "stopPropagation": false
             },
-            "paddingLeft": "30px"
+            "paddingLeft": "30px",
+            "type": "text",
+            "required": true,
+            "onAnimationEnd": {
+              "preventDefault": false,
+              "stopPropagation": false
+            }
           },
           "style": {
-            "transform": "translate(955px, 550px)",
+            "transform": "translate(47.5px, 79px)",
             "width": "370px",
             "height": "80px",
             "left": "0",
@@ -9665,8 +9671,8 @@
           "i": "container-1740054847490",
           "name": "Default-1701",
           "children": ["container-1740054937876", "container-1740055372312"],
-          "parent": null,
-          "isChild": false,
+          "parent": "container-1741543196805",
+          "isChild": true,
           "configuration": {
             "lineHeight": 1,
             "overflowX": "visible",
@@ -9676,10 +9682,10 @@
             "iconColor": "#ddd",
             "fontColor": "#ddd",
             "fontSize": "16px",
-            "zIndex": 1,
+            "zIndex": 3,
             "borderColor": "#ddd",
             "background": "rgba(91, 181, 67, 1)",
-            "tag": "div",
+            "tag": "button",
             "backgroundImage": "url(null)",
             "outlineStyle": "none",
             "width": 200,
@@ -9716,10 +9722,11 @@
               ],
               "preventDefault": false,
               "stopPropagation": false
-            }
+            },
+            "type": "submit"
           },
           "style": {
-            "transform": "translate(1030px, 663px)",
+            "transform": "translate(43.99993896484375px, 249.00001525878906px)",
             "width": "300px",
             "height": "80px",
             "left": "0",
@@ -9744,7 +9751,7 @@
             "iconColor": "#ddd",
             "fontColor": "rgb(228, 228, 228)",
             "fontSize": "25px",
-            "zIndex": 4,
+            "zIndex": 5,
             "text": "Find Jobs Now",
             "display": "flex",
             "backgroundColor": "rgba(190, 183, 183, 0)",
@@ -9905,7 +9912,7 @@
             "position": "absolute",
             "iconColor": "#ddd",
             "fontColor": "#ddd",
-            "zIndex": 4,
+            "zIndex": 5,
             "icon": {
               "name": "BiSearchAlt2",
               "set": "Bi",
@@ -10006,6 +10013,57 @@
             "transform": "translate(1015.1874542236328px, 1268.6249542236328px)",
             "width": "200px",
             "height": "200px",
+            "left": "0",
+            "top": "0",
+            "zIndex": 1
+          }
+        },
+        {
+          "isGroup": true,
+          "componentId": "container",
+          "i": "container-1741543196805",
+          "name": "Default-7798",
+          "children": ["container-1740054847490", "1740054806864-0"],
+          "parent": null,
+          "isChild": false,
+          "configuration": {
+            "lineHeight": 1,
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "cursor": "Default",
+            "position": "absolute",
+            "iconColor": "#ddd",
+            "fontColor": "#ddd",
+            "fontSize": "16px",
+            "zIndex": 1,
+            "borderColor": "#ddd",
+            "background": "rgba(255, 255, 255, 0)",
+            "tag": "form",
+            "backgroundImage": "url(null)",
+            "outlineStyle": "none",
+            "opacity": 1,
+            "boxShadow": " ",
+            "filter": " ",
+            "display": "flex",
+            "backgroundType": "color",
+            "_overrides_": [],
+            "width": 445,
+            "height": 359,
+            "autoAlign": false,
+            "animations": [],
+            "onAnimationIteration": {
+              "preventDefault": false,
+              "stopPropagation": false
+            },
+            "onSubmit": {
+              "preventDefault": true,
+              "stopPropagation": false
+            }
+          },
+          "style": {
+            "transform": "translate(1367.5px, 225px)",
+            "width": "445px",
+            "height": "359px",
             "left": "0",
             "top": "0",
             "zIndex": 1
@@ -13388,8 +13446,10 @@
     "snap_horizontal": true,
     "edge_draggable": true
   },
-  "company": "6594497b0b9185ef9fbd53db",
-  "currentVersion": "4.2.0",
+  "company": {
+    "$oid": "6594497b0b9185ef9fbd53db"
+  },
+  "currentVersion": "4.2.1",
   "status": "active",
   "layoutSettings": {
     "logo": "",
@@ -13406,10 +13466,14 @@
         "key": "Home",
         "page": "home-7ea27559-5801-4601-b7ba-33d1b5471c41",
         "children": [],
-        "_id": "67acdd23eeb4de8dd39ceafd"
+        "_id": {
+          "$oid": "67acdd23eeb4de8dd39ceafd"
+        }
       }
     ],
-    "_id": "67acdd23eeb4de8dd39ceafc"
+    "_id": {
+      "$oid": "67acdd23eeb4de8dd39ceafc"
+    }
   },
   "controllers": [
     {
@@ -13440,6 +13504,7 @@
             "componentType": "task",
             "id": "74577c04-8e8e-4361-949b-5b0dc3d14679"
           },
+          "branches": {},
           "sequence": [],
           "plugin": "67adfc7409a1607fe03ee144",
           "collection": "cars",
@@ -13487,6 +13552,7 @@
             "componentType": "task",
             "id": "50e911c0-5467-403a-b9a7-f20ba2c31484"
           },
+          "branches": {},
           "sequence": [],
           "plugin": "67bd95ce5549d0d103685fc7",
           "collection": "products",
@@ -13582,6 +13648,7 @@
             "componentType": "task",
             "id": "ad5ba25f-1246-46e7-a626-76e93c1e6163"
           },
+          "branches": {},
           "sequence": [],
           "plugin": "67bd95ce5549d0d103685fc7",
           "collection": "products",
@@ -13629,6 +13696,7 @@
             "componentType": "task",
             "id": "6047d443-cfdb-4b92-8360-7d408ed76a02"
           },
+          "branches": {},
           "sequence": [],
           "plugin": "67bd95ce5549d0d103685fc7",
           "collection": "products",
@@ -13656,16 +13724,22 @@
       "defaultHeaders": []
     }
   ],
-  "createdAt": "2025-02-12T17:40:51.287Z",
-  "updatedAt": "2025-03-09T17:33:20.656Z",
+  "createdAt": {
+    "$date": "2025-02-12T17:40:51.287Z"
+  },
+  "updatedAt": {
+    "$date": "2025-03-09T18:05:31.923Z"
+  },
+  "__v": 0,
   "meta": {
     "s3Bucket": "servly-app-67acdd23eeb4de8dd39ceafb",
-    "cloudFrontDomain": "d2i8z6pstcq4sa.cloudfront.net",
-    "websiteUrl": "https://d2i8z6pstcq4sa.cloudfront.net",
-    "cloudFrontId": "E261OHITN6V7B0",
+    "cloudFrontDomain": "d3jr0dv1snipvd.cloudfront.net",
+    "websiteUrl": "https://d3jr0dv1snipvd.cloudfront.net",
+    "cloudFrontId": "E1L1FMA41YTKGW",
     "bucketUrl": "http://servly-app-67acdd23eeb4de8dd39ceafb.s3-website-us-east-1.amazonaws.com/"
   },
-  "lastDeployment": "2025-03-09T17:17:06.370Z",
-  "isDeploying": false,
-  "id": "67acdd23eeb4de8dd39ceafb"
+  "lastDeployment": {
+    "$date": "2025-03-09T17:35:48.734Z"
+  },
+  "isDeploying": false
 }

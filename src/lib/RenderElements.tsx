@@ -525,12 +525,29 @@ const ElementRenderer = ({
     const handlers = {};
 
     Object.keys(EVENT_HANDLERS).forEach((eventName) => {
-      console.log(item?.configuration?.[eventName], item);
+      // console.log(item?.configuration?.[eventName], item);
       if (!item?.configuration?.[eventName] || item?.configuration?.[eventName]?.plugins?.length === 0) return;
       const configHandler = item?.configuration?.[eventName];
-      console.log(configHandler?.plugins);
+
       if (!isEmpty(configHandler)) {
         handlers[eventName] = (e) => {
+          // if (item?.configuration?.[eventName]?.preventDefault()) {
+          //   e.preventDefault();
+          // }
+          // if (item?.configuration?.[eventName]?.stopPropagation()) {
+          //   e.stopPropagation();
+          // }
+          if (eventName === 'onSubmit') {
+            e.preventDefault();
+          }
+          if (!isEmpty(configHandler?.plugins)) {
+            handlers[eventName] = (e) => {
+              // e.preventDefault();
+
+              // return {};
+              return createEventHandler(e, configHandler, item.i, renderElementUtil);
+            };
+          }
           return createEventHandler(e, configHandler, item.i, renderElementUtil);
         };
       }
@@ -641,7 +658,6 @@ const ElementRenderer = ({
       // dispatch(setCurrentApp({}));
     };
   }, [elements]);
-
   const renderComponent = useCallback(
     (id, props) => {
       // return <>Needs some love</>;
