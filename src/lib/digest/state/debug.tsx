@@ -1,18 +1,17 @@
 // ReactJsonDebug.tsx
 
-import { CloseOutlined } from '@ant-design/icons'
-import React from 'react'
-import { notification } from 'antd'
-
-// import ReactJson from 'react-json-view';
+import { CloseOutlined } from '@ant-design/icons';
+import React from 'react';
+import ReactJson from 'react-json-view';
+import { notification } from 'antd';
 
 // Keep track of active notifications
-let notificationCounter = 0
-const activeNotifications: string[] = []
+let notificationCounter = 0;
+const activeNotifications: string[] = [];
 
 // Custom notification component with ReactJson
 const JsonDebugContent: React.FC<{
-  data: Record<string, any>
+  data: Record<string, any>;
 }> = ({ data }) => {
   return (
     <div className="json-debug-container" style={{ fontSize: '10px' }}>
@@ -22,7 +21,7 @@ const JsonDebugContent: React.FC<{
           style={{
             marginBottom: '4px',
             borderBottom: '1px solid #333',
-            paddingBottom: '4px'
+            paddingBottom: '4px',
           }}
         >
           <div
@@ -30,12 +29,12 @@ const JsonDebugContent: React.FC<{
               color: '#94a3b8',
               fontSize: '10px',
               marginBottom: '2px',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
             }}
           >
             {key}:
           </div>
-          {/* <ReactJson
+          <ReactJson
             style={{
               background: 'transparent',
               fontSize: '0.55rem',
@@ -51,29 +50,26 @@ const JsonDebugContent: React.FC<{
             collapsed={1}
             enableClipboard={true}
             src={data[key] || {}}
-          /> */}
+          />
         </div>
       ))}
     </div>
-  )
-}
+  );
+};
 
 /**
  * Show a debug notification with ReactJson view
  */
-export function showJsonDebug(
-  data: Record<string, any>,
-  title: string = 'Debug'
-): void {
-  const id = `debug-${++notificationCounter}`
+export function showJsonDebug(data: Record<string, any>, title: string = 'Debug'): void {
+  const id = `debug-${++notificationCounter}`;
 
   // Close all existing notifications
   activeNotifications.forEach((existingId) => {
     // notification?.close(existingId);
-  })
+  });
 
   // Add this notification to the active list
-  activeNotifications.push(id)
+  activeNotifications.push(id);
 
   // Configure notification without the default icon
   notification.open({
@@ -87,14 +83,14 @@ export function showJsonDebug(
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0',
-          margin: '0'
+          margin: '0',
         }}
       >
         <span
           style={{
             fontSize: '11px',
             fontWeight: 'bold',
-            color: '#e2e8f0'
+            color: '#e2e8f0',
           }}
         >
           {title}
@@ -121,7 +117,7 @@ export function showJsonDebug(
       borderRadius: '4px',
       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
       border: '1px solid #262626',
-      maxWidth: '380px'
+      maxWidth: '380px',
     },
     className: 'json-debug-notification',
     closeIcon: <CloseOutlined style={{ color: '#94a3b8', fontSize: '10px' }} />,
@@ -129,12 +125,12 @@ export function showJsonDebug(
     duration: 0, // Never auto-close
     onClose: () => {
       // Remove from active notifications on close
-      const index = activeNotifications.indexOf(id)
+      const index = activeNotifications.indexOf(id);
       if (index > -1) {
-        activeNotifications.splice(index, 1)
+        activeNotifications.splice(index, 1);
       }
-    }
-  })
+    },
+  });
 }
 
 // Specialized debug logger for workflow debugging
@@ -148,13 +144,11 @@ export function logJsonDebug(
   process
 ): void {
   // Parse any string values that might be JSON
-  const state = localStorage.getItem(sessionKey)
-  const parsedState = state ? tryParseJSON(state) : {}
+  const state = localStorage.getItem(sessionKey);
+  const parsedState = state ? tryParseJSON(state) : {};
 
-  const sessionInfo = sessionKey
-    ? localStorage.getItem(sessionKey + '-sessionInfo')
-    : '{}'
-  const parsedSessionInfo = tryParseJSON(sessionInfo)
+  const sessionInfo = sessionKey ? localStorage.getItem(sessionKey + '-sessionInfo') : '{}';
+  const parsedSessionInfo = tryParseJSON(sessionInfo);
 
   showJsonDebug(
     {
@@ -162,25 +156,25 @@ export function logJsonDebug(
       history: getUrlDetails(paramState),
       event: event,
       state: parsedState,
-      sessionInfo: parsedSessionInfo
+      sessionInfo: parsedSessionInfo,
     },
     process.name || 'Workflow Debug'
-  )
+  );
 }
 
 // Helper function to safely parse JSON
 function tryParseJSON(jsonString: string | null): any {
-  if (!jsonString) return {}
+  if (!jsonString) return {};
   try {
-    return JSON.parse(jsonString)
+    return JSON.parse(jsonString);
   } catch (e) {
-    return { error: 'Invalid JSON', raw: jsonString }
+    return { error: 'Invalid JSON', raw: jsonString };
   }
 }
 
 // Add global styles to document
 export function initJsonDebugStyles(): void {
-  const styleEl = document.createElement('style')
+  const styleEl = document.createElement('style');
   styleEl.innerHTML = `
     .json-debug-notification {
       margin: 0 !important;
@@ -198,12 +192,12 @@ export function initJsonDebugStyles(): void {
     .json-debug-notification .ant-notification-notice-with-icon .ant-notification-notice-description {
       margin-left: 0 !important;
     }
-  `
-  document.head.appendChild(styleEl)
+  `;
+  document.head.appendChild(styleEl);
 }
 
 export default {
   showJsonDebug,
   logJsonDebug,
-  initJsonDebugStyles
-}
+  initJsonDebugStyles,
+};

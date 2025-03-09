@@ -4,13 +4,17 @@ import { Col, Flex, Row } from 'antd';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { EVENT_HANDLERS } from './eventHandlersTypes';
+import { IconRenderer } from './IconRenderer';
 import InlineEditText from './InLineTextEditor';
 import VirtualElementWrapper from './VitualElementWrapper';
 import { flattenStyleObject } from './flattenStyleObject';
+import { generateComponentGroups } from './list';
 import { isEmpty } from 'lodash';
 import { processController } from './digest/digester';
 import renderElementUtil from './renderElementUtil';
 import { retrieveBody } from './digest/state/utils';
+
+// import { IconRenderer } from './IconSelector';
 
 // import { refreshAppAuth } from '@/store';
 
@@ -59,6 +63,7 @@ const SELF_CLOSING_TAGS = new Set([
 const ElementItem = ({
   item: oldItem,
   // appState,
+  allComponentsRaw,
   setAppStatePartial,
   setCommentPos,
   targets,
@@ -90,6 +95,7 @@ const ElementItem = ({
   setDestroyInfo,
   setSessionInfo,
   storeInvocation,
+  setItemToEdit,
 }) => {
   // message.error(JSON.stringify(editMode));
   const item = { ...oldItem };
@@ -329,7 +335,9 @@ const ElementItem = ({
     const children = item?.isGroup ? (
       <ElementRenderer
         setAppStatePartial={setAppStatePartial}
+        allComponentsRaw={allComponentsRaw}
         isWrapper={false}
+        setItemToEdit={setItemToEdit}
         elements={elements}
         parentId={item.i}
         editMode={editMode}
@@ -344,6 +352,7 @@ const ElementItem = ({
         // renderComponent={renderComponent}
         currentApplication={currentApplication}
         tab={tab}
+        // allComponents={allComponents}
         navigate={navigate}
         AntDesign={AntDesign}
         ReactJson={ReactJson}
@@ -446,6 +455,7 @@ const ElementItem = ({
 
 const ElementRenderer = ({
   isWrapper = true,
+  setItemToEdit,
   setCommentPos,
   elements,
   parentId,
@@ -479,6 +489,7 @@ const ElementRenderer = ({
   setDestroyInfo,
   setSessionInfo,
   storeInvocation,
+  allComponentsRaw = [],
 }) => {
   const [elementsToRender, setElementsToRender] = useState(elements);
 
@@ -600,86 +611,106 @@ const ElementRenderer = ({
     params,
     // renderElementUtil,
     readOnly,
+
     localStorage.getItem(currentApplication?._id + '-' + 'sessionInfo'),
   ]);
+
+  const uniqueElements = useMemo(() => {
+    return Array.from(new Map(elementsToRender.map((item) => [item.i, item])).values());
+  }, [elementsToRender]);
+  const [allComponents, setallComponents] = useState([]);
+  const processedComponents = useMemo(
+    () => allComponentsRaw?.map((item) => generateComponentGroups(item)) || [],
+    [allComponentsRaw]
+  );
+  const componentsMap = useMemo(() => {
+    return allComponents?.reduce((map, component) => {
+      if (component?.value) {
+        map[component.value] = component.config?.component;
+      }
+      return map;
+    }, {});
+  }, [allComponentsRaw, allComponents]);
+
+  useEffect(() => {
+    // dispatch(setCurrentApp({}));
+    setallComponents(processedComponents);
+    // fetchApp2();
+    console.log(processedComponents);
+    () => {
+      // dispatch(setCurrentApp({}));
+    };
+  }, [elements]);
   const renderComponent = useCallback(
     (id, props) => {
-      return <>Needs some love</>;
-      // if (props.componentId === 'text') {
-      //   return (
-      //     <InlineEditText
-      //       // lineType="inline"
-      //       overflowEffect="elipsis"
-      //       scale={scale}
-      //       isEditable={editMode}
-      //       parentRef={containerRef}
-      //       isCurrentTarget={itemToEdit.i === props.i}
-      //       targeted={true}
-      //       onType={(e) => {
-      //         setElements((prev) => {
-      //           return prev.map((el) => {
-      //             if (el.i === props.i) {
-      //               const updatedConfig = {
-      //                 ...el.configuration,
-      //               };
-      //               updatedConfig.text = e.target?.value;
-      //               return {
-      //                 ...el,
-      //                 configuration: updatedConfig,
-      //               };
-      //             }
-      //             return el;
-      //           });
-      //         });
-      //         setItemToEdit({
-      //           ...itemToEdit,
-      //           configuration: {
-      //             ...itemToEdit.configuration,
-      //             text: e.target?.value,
-      //           },
-      //         });
-      //       }}
-      //       overRideStyles={{
-      //         ...props?.configuration,
-      //       }}
-      //       initialText={props?.configuration?.text}
-      //     />
-      //   );
-      // }
-      // if (props.componentId === 'icon') {
-      //   return (
-      //     <div className="pointer-events-none">
-      //       <IconRenderer
-      //         icon={
-      //           props?.configuration?.icon || {
-      //             name: 'FaHouse',
-      //             set: 'Fa6',
-      //             setName: 'Font Awesome 6',
-      //           }
-      //         }
-      //         color={props?.configuration?.iconColor || 'red'}
-      //         size={props?.configuration?.iconSize}
-      //       />
-      //     </div>
-      //   );
-      // }
-      // if (props.componentId === 'icon') {
-      //   return (
-      //     <div className="pointer-events-none">
-      //       <IconRenderer
-      //         icon={
-      //           props?.configuration?.icon || {
-      //             name: 'FaHouse',
-      //             set: 'Fa6',
-      //             setName: 'Font Awesome 6',
-      //           }
-      //         }
-      //         color={props?.configuration?.iconColor || '#333'}
-      //         size={props?.configuration?.iconSize}
-      //       />
-      //     </div>
-      //   );
-      // }
+      // return <>Needs some love</>;
+      if (props.componentId === 'text') {
+        return (
+          <InlineEditText
+            // lineType="inline"
+            overflowEffect="elipsis"
+            // scale={scale}
+            isEditable={editMode}
+            // parentRef={containerRef}
+            // isCurrentTarget={itemToEdit.i === props.i}
+            targeted={true}
+            onType={(e) => {
+              setElementsToRender((prev) => {
+                return prev.map((el) => {
+                  if (el.i === props.i) {
+                    const updatedConfig = {
+                      ...el.configuration,
+                    };
+                    updatedConfig.text = e.target?.value;
+                    return {
+                      ...el,
+                      configuration: updatedConfig,
+                    };
+                  }
+                  return el;
+                });
+              });
+              setItemToEdit((prev) => {
+                return prev.map((el) => {
+                  if (el.i === props.i) {
+                    const updatedConfig = {
+                      ...el.configuration,
+                    };
+                    updatedConfig.text = e.target?.value;
+                    return {
+                      ...el,
+                      configuration: updatedConfig,
+                    };
+                  }
+                  return el;
+                });
+              });
+            }}
+            overRideStyles={{
+              ...props?.configuration,
+            }}
+            initialText={props?.configuration?.text}
+          />
+        );
+      }
+      if (props.componentId === 'icon') {
+        return (
+          <div className="pointer-events-none">
+            <IconRenderer
+              icon={
+                props?.configuration?.icon || {
+                  name: 'FaHouse',
+                  set: 'Fa6',
+                  setName: 'Font Awesome 6',
+                }
+              }
+              color={props?.configuration?.iconColor || 'red'}
+              size={props?.configuration?.iconSize}
+            />
+          </div>
+        );
+      }
+
       // if (props.componentId === 'divider') {
       //   return <DividerComponent configuration={props?.configuration} i={id} />;
       // }
@@ -727,48 +758,39 @@ const ElementRenderer = ({
       //     />
       //   );
       // }
-      // const Component = componentsMap?.[id];
-      // if (props.componentId === 'canvas') {
-      //   return <></>;
-      // }
-      // if (!Component) {
-      //   return 'nothing';
-      // }
-      // const RenderedComponent = Component({
-      //   title: props.title,
-      //   editMode: editMode,
-      //   item: {
-      //     meta: props,
-      //   },
-      //   configuration: props.configuration,
-      //   ...props,
-      // });
-      // if (props.componentId === 'text') {
-      //   return (
-      //     <div className="bg-blue-100">
-      //       <Input variant="borderless" value={'kkk'} />
-      //     </div>
-      //   );
-      // } else {
-      //   return RenderedComponent?.type
-      //     ? React.createElement(RenderedComponent.type, {
-      //         ...RenderedComponent.props,
-      //       })
-      //     : '';
-      // }
-    },
-    [editMode, isDrawingPathActive]
-  );
-  const uniqueElements = useMemo(() => {
-    return Array.from(new Map(elementsToRender.map((item) => [item.i, item])).values());
-  }, [elementsToRender]);
+      const Component = componentsMap?.[id];
+      console.log(componentsMap, id);
+      if (props.componentId === 'canvas') {
+        return <></>;
+      }
+      if (!Component) {
+        return 'Nothing set';
+      }
+      const RenderedComponent = Component({
+        title: props.title,
+        editMode: editMode,
+        item: {
+          meta: props,
+        },
+        configuration: props.configuration,
+        ...props,
+      });
 
+      return RenderedComponent?.type
+        ? React.createElement(RenderedComponent.type, {
+            ...RenderedComponent.props,
+          })
+        : '';
+    },
+    [editMode, isDrawingPathActive, componentsMap]
+  );
   const filteredElements = useMemo(() => {
     // message.info('j');
     return uniqueElements
       .filter((item) => item.parent === parentId && item.i)
       .map((item, index) => (
         <ElementItem
+          setItemToEdit={setItemToEdit}
           store={store}
           refreshAppAuth={refreshAppAuth}
           setDestroyInfo={setDestroyInfo}
@@ -779,8 +801,10 @@ const ElementRenderer = ({
           key={item.i}
           setAppStatePartial={setAppStatePartial}
           isDragging={isDragging}
+          allComponentsRaw={allComponentsRaw}
           targets={targets}
           // appState={appState}
+          allComponents={allComponents}
           setElementsToRender={setElementsToRender}
           item={item}
           index={index}
@@ -826,6 +850,7 @@ const ElementRenderer = ({
     AntDesign,
     ReactJson,
   ]);
+  console.log(allComponentsRaw);
   return (
     <>
       {isWrapper ? (
