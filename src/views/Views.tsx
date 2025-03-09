@@ -1,12 +1,85 @@
 import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import store, { setDestroyInfo, setSessionInfo } from '@/store';
 
 import ElementRenderer from '../lib/RenderElements';
-import { Suspense } from 'react';
 import appConfig from '../../appConfig.json';
 import { storeInvocation } from '@/services/invocationService';
 
 // const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
+const ScaleContainer = ({
+  designWidth = 1440,
+  designHeight = 900,
+  children,
+  className = '',
+  maxScale = 5,
+  style,
+  minScale = 0.3,
+}) => {
+  // Use useCallback for the scale calculation function
+  const calculateDimensions = useCallback(() => {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Always use the width scale as the primary scale factor
+    // This ensures width always fills the screen
+    let newScale = viewportWidth / designWidth;
+
+    // Apply min/max constraints
+    newScale = Math.min(Math.max(newScale, minScale), maxScale);
+
+    const scaledWidth = designWidth * newScale;
+    const scaledHeight = designHeight * newScale;
+
+    // Center vertically
+    const x = 0; // No horizontal centering since we want to fill width
+    const y = Math.max(0, (viewportHeight - scaledHeight) / 2);
+
+    return { scale: newScale, position: { x, y } };
+  }, [designWidth, designHeight, maxScale, minScale]);
+
+  // Use useMemo for the initial calculation
+  const initialDimensions = useMemo(() => calculateDimensions(), [calculateDimensions]);
+
+  // Move state initialization to use memoized values
+  const [scale, setScale] = useState(initialDimensions.scale);
+  const [position, setPosition] = useState(initialDimensions.position);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      const newDimensions = calculateDimensions();
+      setScale(newDimensions.scale);
+      setPosition(newDimensions.position);
+    };
+
+    // Initial calculation to ensure correct starting position
+    updateDimensions();
+
+    // Add resize listener for future changes
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, [calculateDimensions]);
+
+  // Memoize the style object to prevent unnecessary recalculations
+  const containerStyle = useMemo(
+    () => ({
+      ...style,
+      width: `${designWidth}px`,
+      height: `${designHeight}px`,
+      transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+      transformOrigin: '0 0',
+    }),
+    [style, designWidth, designHeight, position.x, position.y, scale]
+  );
+
+  return (
+    <div className="fixed inset-0 overflow-hidden">
+      <div className={`absolute ${className}`} style={containerStyle}>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 const Views = () => {
   // const navigate = useNavigate();
@@ -20,7 +93,7 @@ const Views = () => {
               key={`${route.id}`}
               path={`/${route.id}`}
               element={
-                <div className="w-[auto] bg-white">
+                <ScaleContainer className="w-[auto] bg-white">
                   {' '}
                   <ElementRenderer
                     setAppStatePartial={() => ''}
@@ -47,7 +120,7 @@ const Views = () => {
                     storeInvocation={storeInvocation}
                   />
                   rtfgtrg
-                </div>
+                </ScaleContainer>
               }
             />
           );
@@ -55,7 +128,11 @@ const Views = () => {
         <Route
           path="/"
           element={
-            <>
+            <ScaleContainer
+              designWidth={appConfig?.views?.[0]?.configuration?.deviceScreen?.size?.width}
+              designHeight={appConfig?.views?.[0]?.configuration?.deviceScreen?.size?.height}
+              // style={parentStyle}
+            >
               <ElementRenderer
                 // setAppStatePartial={setAppStatePartial}
                 // parentStyle={}
@@ -82,7 +159,7 @@ const Views = () => {
                 storeInvocation={storeInvocation}
               />
               {/* {appConfig?.views?.[0]?.name} */}
-            </>
+            </ScaleContainer>
           }
         />
       </Routes>

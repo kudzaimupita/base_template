@@ -641,6 +641,7 @@ const ElementRenderer = ({
       // dispatch(setCurrentApp({}));
     };
   }, [elements]);
+
   const renderComponent = useCallback(
     (id, props) => {
       // return <>Needs some love</>;
