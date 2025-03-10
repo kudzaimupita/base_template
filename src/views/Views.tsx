@@ -83,6 +83,41 @@ const ScaleContainer = ({
 
 const Views = () => {
   // const navigate = useNavigate();
+  useEffect(() => {
+    // Set document title from config
+    if (appConfig?.title || appConfig.name) {
+      document.title = appConfig?.title || appConfig.name;
+    }
+
+    // Set favicon from base64 config
+    if (appConfig.icon) {
+      const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+      link.type = 'image/png';
+      link.rel = 'icon';
+      link.href = appConfig?.icon || '';
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
+  }, []);
+  const getDefaultPage = (appConfig) => {
+    // Guard clause for missing appConfig
+    if (!appConfig?.views?.length) {
+      return {};
+    }
+
+    const defaultPageId = appConfig?.layoutSettings?.defaultPrivatePage;
+
+    // If defaultPrivatePage is set, try to find that view
+    if (defaultPageId) {
+      const specifiedPage = appConfig.views.find((view) => view.id === defaultPageId);
+      // Return found page or fallback to first view
+      return specifiedPage || appConfig.views[0];
+    }
+
+    // If no defaultPrivatePage is set, use first view
+    return appConfig.views[0];
+  };
+
+  const defaultPage = getDefaultPage(appConfig);
   return (
     <Suspense fallback={<div className="flex flex-auto flex-col h-[100vh]">{/* <ModernSpinner /> */}</div>}>
       <Routes>
@@ -132,21 +167,21 @@ const Views = () => {
           path="/"
           element={
             <ScaleContainer
-              designWidth={appConfig?.views?.[0]?.configuration?.deviceScreen?.size?.width}
-              designHeight={appConfig?.views?.[0]?.configuration?.deviceScreen?.size?.height}
+              designWidth={defaultPage?.configuration?.deviceScreen?.size?.width}
+              designHeight={defaultPage?.configuration?.deviceScreen?.size?.height}
               // style={parentStyle}
             >
               <ElementRenderer
                 // setAppStatePartial={setAppStatePartial}
                 // parentStyle={}
-                parentStyle={appConfig?.views?.[0]?.style}
+                parentStyle={defaultPage?.style}
                 // propsData={propsData}
                 // propsData={propsData}
                 targets={[]}
                 // dispatch={useDispatch()}
-                elements={appConfig?.views?.[0]?.layout}
+                elements={defaultPage?.layout}
                 readOnly={false}
-                tab={appConfig?.views?.[0]?.id}
+                tab={defaultPage?.id}
                 // navigate={navigate}
                 appState={{}}
                 parentId={null}
@@ -161,7 +196,7 @@ const Views = () => {
                 setSessionInfo={setSessionInfo}
                 storeInvocation={storeInvocation}
               />
-              {/* {appConfig?.views?.[0]?.name} */}
+              {/* {defaultPage?.name} */}
             </ScaleContainer>
           }
         />
