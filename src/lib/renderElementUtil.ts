@@ -85,7 +85,10 @@ const renderElementUtil = (
               dispatch(
                 setAppStatePartial({
                   key: tab + '.' + newChildId + '.' + defaults?.[key]?.targetField,
-                  payload: retrieveBody(null, defaults?.[key]?.value, {}, {}, {}, 'key', { compId: newChildId }),
+                  payload: retrieveBody(null, defaults?.[key]?.value, {}, {}, {}, 'key', {
+                    compId: newChildId,
+                    store: process?.store,
+                  }),
                 })
               );
             });
@@ -138,7 +141,10 @@ const renderElementUtil = (
             dispatch(
               setAppStatePartial({
                 key: tab + '.' + newElementId + '.' + defaults?.[key]?.targetField,
-                payload: retrieveBody(null, defaults?.[key]?.value, {}, {}, {}, 'key', { compId: newElementId }),
+                payload: retrieveBody(null, defaults?.[key]?.value, {}, {}, {}, 'key', {
+                  compId: newElementId,
+                  store: process?.store,
+                }),
               })
             );
           }

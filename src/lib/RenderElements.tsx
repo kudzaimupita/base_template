@@ -143,7 +143,7 @@ const ElementItem = ({
                 tab,
                 (process) =>
                   renderElementUtil(
-                    process,
+                    { ...process, store },
                     elements,
                     setElementsToRender,
                     appState,
@@ -584,7 +584,7 @@ const ElementRenderer = ({
                 tab,
                 (process) =>
                   renderElementUtil(
-                    process,
+                    { ...process, store },
                     elements,
                     setElementsToRender,
                     appState,
