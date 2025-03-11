@@ -262,7 +262,9 @@ export const nativePlugins = {
                       process.compId,
                       process.pageId,
                       event,
-                      process?.renderElementUtil
+                      process?.renderElementUtil,
+                      process?.editMode,
+                      process
                     );
                     return getValueByPath(result?.data, process.name);
                   } catch (error) {
@@ -7979,7 +7981,9 @@ export const nativePlugins = {
             process.pageId,
             event,
             process?.renderElementUtil,
-            process.editMode
+            process.editMode,
+            // process?.editMode,
+            process
           );
         } catch (error) {
           globalErrors[process.name] = error;

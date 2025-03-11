@@ -507,7 +507,7 @@ export const getUrlDetails = (paramss = {}) => {
 };
 export const retrieveBody = (type, value, event, globalObj, paramState, key, process) => {
   const newValue = deepParse(value, event, globalObj || {}, JSON.parse(localStorage.getItem(key || '') || '{}'));
-  const state = process?.store.getState();
+  const state = process?.store?.getState();
   let newBody = {};
   let localStore;
   try {
@@ -533,9 +533,9 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
     const parts = cleanPath.split('.');
 
     // Get the base object - if compId is missing, just use state.appState[pathname[4]]
-    let result = process.compId ? state.appState[pathname[4]]?.[process.compId] : state.appState[pathname[4]];
+    let result = process?.compId ? state?.appState?.[pathname[4]]?.[process.compId] : state?.appState?.[pathname[4]];
 
-    console.log(state.appState[pathname[4]], process.compId, newValue, parts, result);
+    // console.log(state.appState[pathname[4]], process.compId, newValue, parts, result);
 
     // Handle multi-level property access by traversing the object
     if (result && parts.length) {
@@ -571,7 +571,7 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
     event: event,
     history: getUrlDetails(paramState),
     localStore: localStore,
-    state: dotNotationKeysToObject(state.appState || {}),
+    state: dotNotationKeysToObject(state?.appState || {}),
     controller: dotNotationKeysToObject(globalObj || {}),
   });
   // console.log(newBody, newValue, {

@@ -149,12 +149,26 @@ export function logJsonDebug(
 
   const sessionInfo = sessionKey ? localStorage.getItem(sessionKey + '-sessionInfo') : '{}';
   const parsedSessionInfo = tryParseJSON(sessionInfo);
+  function getCircularReplacer() {
+    const seen = new WeakSet();
+    return (key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return '[Circular Reference]';
+        }
+        seen.add(value);
+      }
+      return value;
+    };
+  }
 
+  const stringified = JSON.stringify(event, getCircularReplacer());
+  console.log(stringified, JSON.parse(stringified));
   showJsonDebug(
     {
       controller: globalObj,
       history: getUrlDetails(paramState),
-      event: event,
+      event: JSON.parse(stringified),
       state: parsedState,
       sessionInfo: parsedSessionInfo,
     },

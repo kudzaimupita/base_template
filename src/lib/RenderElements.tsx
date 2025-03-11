@@ -4,6 +4,7 @@ import { Col, Flex, Row } from 'antd';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { EVENT_HANDLERS } from './eventHandlersTypes';
+import ErrorBoundary from './ErrorBoundary';
 import { IconRenderer } from './IconRenderer';
 import InlineEditText from './InLineTextEditor';
 import VirtualElementWrapper from './VitualElementWrapper';
@@ -275,6 +276,7 @@ const ElementItem = ({
       },
       style: processedStyle,
       className: `
+      ${item.i}
       ${item?.isGroup ? 'group-container ' : ' '}
      
       ${item?.configuration?.classNames} 
@@ -731,50 +733,61 @@ const ElementRenderer = ({
       // if (props.componentId === 'divider') {
       //   return <DividerComponent configuration={props?.configuration} i={id} />;
       // }
-      // if (props.componentId === 'drawpath') {
-      //   return (
-      //     <DrawPathComponent
-      //       configuration={{
-      //         ...props.configuration,
-      //         isSelected: true,
-      //         showControls: selectedPath?.i === props.i && showControls,
-      //       }}
-      //       isEditing={props.i === activeDrawingPathId}
-      //       setActiveDrawingPathId={setActiveDrawingPathId}
-      //       activeDrawingPathId={activeDrawingPathId}
-      //       isDrawingPathActive={isDrawingPathActive}
-      //       onPathClick={(e) => {
-      //         e.stopPropagation();
-      //         setSelectedPath(props);
-      //         setShowControls(false);
-      //       }}
-      //       onPathDoubleClick={(e) => {
-      //         e.stopPropagation();
-      //         setSelectedPath(props);
-      //         setShowControls(true);
-      //       }}
-      //       onHandleDrag={(pointIndex, handleType, handle) => {
-      //         setDraggingHandle({ pathId: props.i, pointIndex, handleType, handle });
-      //       }}
-      //       onPathUpdate={(newPath) => {
-      //         setElements((prev) =>
-      //           prev.map((el) => {
-      //             if (el.i === props.i) {
-      //               return {
-      //                 ...el,
-      //                 configuration: {
-      //                   ...el.configuration,
-      //                   d: newPath,
-      //                 },
-      //               };
-      //             }
-      //             return el;
-      //           })
-      //         );
-      //       }}
-      //     />
-      //   );
-      // }
+      if (props.componentId === 'drawpath') {
+        return (
+          // <DrawPathComponent
+          //   configuration={{
+          //     ...props.configuration,
+          //     isSelected: true,
+          //     showControls: selectedPath?.i === props.i && showControls,
+          //   }}
+          //   isEditing={props.i === activeDrawingPathId}
+          //   setActiveDrawingPathId={setActiveDrawingPathId}
+          //   activeDrawingPathId={activeDrawingPathId}
+          //   isDrawingPathActive={isDrawingPathActive}
+          //   onPathClick={(e) => {
+          //     e.stopPropagation();
+          //     setSelectedPath(props);
+          //     setShowControls(false);
+          //   }}
+          //   onPathDoubleClick={(e) => {
+          //     e.stopPropagation();
+          //     setSelectedPath(props);
+          //     setShowControls(true);
+          //   }}
+          //   onHandleDrag={(pointIndex, handleType, handle) => {
+          //     setDraggingHandle({ pathId: props.i, pointIndex, handleType, handle });
+          //   }}
+          //   onPathUpdate={(newPath) => {
+          //     setElements((prev) =>
+          //       prev.map((el) => {
+          //         if (el.i === props.i) {
+          //           return {
+          //             ...el,
+          //             configuration: {
+          //               ...el.configuration,
+          //               d: newPath,
+          //             },
+          //           };
+          //         }
+          //         return el;
+          //       })
+          //     );
+          //   }}
+          // />
+          <svg width="100%" height="100%" style={{ overflow: 'visible' }}>
+            <path
+              d={newPath}
+              fill="none"
+              stroke="#000"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        );
+      }
       const Component = componentsMap?.[id];
       console.log(componentsMap, id);
       if (props.componentId === 'canvas') {
@@ -806,46 +819,48 @@ const ElementRenderer = ({
     return uniqueElements
       .filter((item) => item.parent === parentId && item.i)
       .map((item, index) => (
-        <ElementItem
-          setItemToEdit={setItemToEdit}
-          store={store}
-          refreshAppAuth={refreshAppAuth}
-          setDestroyInfo={setDestroyInfo}
-          setSessionInfo={setSessionInfo}
-          storeInvocation={storeInvocation}
-          appState={appState}
-          dispatch={dispatch}
-          key={item.i}
-          setAppStatePartial={setAppStatePartial}
-          isDragging={isDragging}
-          allComponentsRaw={allComponentsRaw}
-          targets={targets}
-          // appState={appState}
-          allComponents={allComponents}
-          setElementsToRender={setElementsToRender}
-          item={item}
-          index={index}
-          elements={elementsToRender}
-          editMode={editMode}
-          isDrawingPathActive={isDrawingPathActive}
-          setIsDrawingPathActive={setIsDrawingPathActive}
-          setActiveDrawingPathId={setActiveDrawingPathId}
-          activeDrawingPathId={activeDrawingPathId}
-          createEventHandlers={createEventHandlers}
-          renderComponent={renderComponent}
-          currentApplication={currentApplication}
-          tab={tab}
-          navigate={navigate}
-          AntDesign={AntDesign}
-          ReactJson={ReactJson}
-          builderCursorMode={builderCursorMode}
-          readOnly={readOnly}
-          // editM
-          setCommentPos={setCommentPos}
-          setSelectedElements={setSelectedElements}
-          // isDragging={isDragging}
-          flattenStyleObject={flattenStyleObject}
-        />
+        <ErrorBoundary fallback={<p>You can provide a custom fallback component here</p>}>
+          <ElementItem
+            setItemToEdit={setItemToEdit}
+            store={store}
+            refreshAppAuth={refreshAppAuth}
+            setDestroyInfo={setDestroyInfo}
+            setSessionInfo={setSessionInfo}
+            storeInvocation={storeInvocation}
+            appState={appState}
+            dispatch={dispatch}
+            key={item.i}
+            setAppStatePartial={setAppStatePartial}
+            isDragging={isDragging}
+            allComponentsRaw={allComponentsRaw}
+            targets={targets}
+            // appState={appState}
+            allComponents={allComponents}
+            setElementsToRender={setElementsToRender}
+            item={item}
+            index={index}
+            elements={elementsToRender}
+            editMode={editMode}
+            isDrawingPathActive={isDrawingPathActive}
+            setIsDrawingPathActive={setIsDrawingPathActive}
+            setActiveDrawingPathId={setActiveDrawingPathId}
+            activeDrawingPathId={activeDrawingPathId}
+            createEventHandlers={createEventHandlers}
+            renderComponent={renderComponent}
+            currentApplication={currentApplication}
+            tab={tab}
+            navigate={navigate}
+            AntDesign={AntDesign}
+            ReactJson={ReactJson}
+            builderCursorMode={builderCursorMode}
+            readOnly={readOnly}
+            // editM
+            setCommentPos={setCommentPos}
+            setSelectedElements={setSelectedElements}
+            // isDragging={isDragging}
+            flattenStyleObject={flattenStyleObject}
+          />
+        </ErrorBoundary>
       ));
   }, [
     uniqueElements,
