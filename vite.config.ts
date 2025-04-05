@@ -70,6 +70,9 @@ export default defineConfig({
       'react-dom',
       'lodash',
       'antd',
+      '@emotion/react',
+      '@emotion/styled',
+      '@emotion/cache',
       // '@mui/material'
     ],
     exclude: ['@fullcalendar/react'],
