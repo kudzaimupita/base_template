@@ -3,6 +3,7 @@ import { initJsonDebugStyles, logJsonDebug } from './debug';
 
 import WebSocket from 'ws';
 import axios from 'axios';
+import { isArray } from 'lodash';
 import { message } from 'antd';
 
 async function downloadFile(input, filename, mimeType = 'application/octet-stream') {
@@ -266,34 +267,86 @@ export const statePlugin = {
         te,
         renderElementUtil
       ) => {
-        let key = '';
-        const newState = {};
-        // message.error('ff');
-        renderElementUtil(process);
-        try {
-          // if (process.level === 'component') {
-          //   if (process.pageId) key = process.pageId;
-          //   if (process?.elementOverride) {
-          //     key = `${key}.${process.elementOverride}`;
-          //   } else {
-          //     key = `${key}.${process.compId}`;
-          //   }
-          //   key = key
-          //     ? `${key}.${retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey,process.compId)}`
-          //     : retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey,process.compId);
-          // }
-          // if (process.level === 'page') {
-          //   if (process.pageId) key = process.pageId;
-          //   key = key
-          //     ? `${key}.${retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey,process.compId)}`
-          //     : retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey,process.compId);
-          // }
-          // if (process.level === 'global') {
-          //   key = key
-          //     ? `${key}.${retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey,process.compId)}`
-          //     : retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey,process.compId);
-          // }
+        // const blueprint = process?.allElements?.find((el) => el.i === process?.propsMapper?.blueprint);
+        // const targetElement = process?.propsMapper?.targetElement;
+        // const propsMap = process?.propsMapper.mappings;
+        // const defaults = process?.propsMapper.defaults;
+        // const newElementId = `${targetElement}-${process?.propsMapper.blueprint}-virtual-${process?.currentIndex}`;
+        // const findAndProcessChildren = (originalId, newParentId, isParent) => {
+        //   if (!process.setAppStatePartial) {
+        //     return [];
+        //   }
+        //   const childElements = process.allElements?.filter((el) => el.parent === originalId) || [];
+        //   return childElements
+        //     ?.map((childd) => {
+        //       const child = { ...childd };
+        //       const newChildId = `${newParentId}-child-${child.i}`;
+        //       process?.store.dispatch(
+        //         process?.setAppStatePartial({
+        //           key: process?.tab + '.' + newChildId,
+        //           payload: process.currentItem,
+        //         })
+        //       );
+        //       Object.keys(process?.propsMapper?.defaults || {})?.map((key) => {
+        //         // console.log(mapItem?.value);
+        //         if (process?.propsMapper?.defaults[key]?.element === childd?.i) {
+        //           process?.store.dispatch(
+        //             process?.setAppStatePartial({
+        //               key: process?.tab + '.' + newChildId + '.' + defaults?.[key]?.targetField,
+        //               payload: retrieveBody(
+        //                 null,
+        //                 process?.propsMapper?.defaults[key]?.value,
+        //                 process?.event,
+        //                 process?.globalObj,
+        //                 process?.paramState,
+        //                 process?.sessionKey,
+        //                 {
+        //                   compId: newChildId,
+        //                   store: process?.store,
+        //                 }
+        //               ),
+        //             })
+        //           );
+        //         }
+        //       });
+        //       propsMap?.map((mapItem) => {
+        //         if (mapItem?.element === childd?.i) {
+        //           // message.info(newChildId);
 
+        //           process?.store.dispatch(
+        //             process?.setAppStatePartial({
+        //               key: process?.tab + '.' + newChildId + '.' + mapItem?.field,
+        //               payload: retrieveBody(
+        //                 null,
+        //                 mapItem?.value,
+        //                 process?.event,
+        //                 process?.globalObj,
+        //                 process?.paramState,
+        //                 process?.sessionKey,
+        //                 {
+        //                   compId: newChildId,
+        //                   store: process?.store,
+        //                 }
+        //               ),
+        //             })
+        //           );
+        //         }
+        //       });
+
+        //       const processedChild = {};
+
+        //       // Recursively process this child's children
+        //       const grandChildren = findAndProcessChildren(child.i, newChildId, false);
+        //       return [processedChild, ...grandChildren];
+        //     })
+        //     .flat();
+        // };
+
+        // // Get all nested children with updated IDs and parents
+        // findAndProcessChildren(process?.propsMapper?.blueprint, newElementId, true);
+
+        renderElementUtil({ ...process, event, globalObj, sessionKey, paramState });
+        try {
           globalObj[process.name] = {
             data: '',
           };
@@ -382,13 +435,16 @@ export const statePlugin = {
               : retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey, process);
           }
           const payload = retrieveBody('', process.payload.value, event, globalObj, paramState, sessionKey, process);
+
           newState[key] = payload;
-          process?.store.dispatch(
-            process?.setAppStatePartial({
-              payload,
-              key,
-            })
-          );
+          // return;
+          payload !== '' &&
+            process?.store.dispatch(
+              process?.setAppStatePartial({
+                payload,
+                key,
+              })
+            );
           globalObj[process.name] = {
             data: newState,
           };
@@ -893,7 +949,7 @@ export const statePlugin = {
 
               // Send message
               connection.ws.send(message);
-              message.info(`Sent WebSocket message on connection: ${connectionId}`);
+              // message.info(`Sent WebSocket message on connection: ${connectionId}`);
 
               // Store result
               globalObj[process.name] = {
@@ -926,7 +982,7 @@ export const statePlugin = {
 
               // Close connection
               connection.ws.close(1000, 'Closed by application');
-              message.info(`Closing WebSocket connection: ${connectionId}`);
+              // message.info(`Closing WebSocket connection: ${connectionId}`);
 
               // Wait for close event
               await new Promise((resolve) => {
@@ -1057,7 +1113,7 @@ export const statePlugin = {
           let headers = {
             'Content-Type': 'application/json',
           };
-          console.log(operation);
+
           // Process variables if provided
           if (process.variables?.value) {
             try {
@@ -1184,6 +1240,435 @@ export const statePlugin = {
           }
 
           message.error(errorMessage);
+        }
+      },
+    },
+    {
+      key: 'window-functions',
+      label: 'Window Functions Action',
+      schema: {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            pattern: '^[^.]+$',
+            description: 'Unique name for the window action',
+          },
+          actionType: {
+            // type: 'object',
+            type: 'string',
+            title: 'Window Function Type',
+            enum: [
+              // Window Methods
+              'open',
+              'close',
+              'print',
+              'alert',
+              'confirm',
+              'prompt',
+
+              // Window Properties Manipulation
+              'resize',
+              'resizeBy',
+              'moveTo',
+              'moveBy',
+
+              // Scrolling
+              'scroll',
+              'scrollTo',
+              'scrollBy',
+
+              // Location Manipulation
+              'reload',
+
+              // Media Interaction
+              'focus',
+              'blur',
+
+              // Browser History
+              'back',
+              'forward',
+              'go',
+
+              // Advanced Window Interactions
+              'postMessage',
+              'openDialog',
+
+              // Performance and Timing
+              'requestAnimationFrame',
+              'setTimeout',
+              'setInterval',
+
+              // Device and Screen
+              'matchMedia',
+
+              // Security and Permissions
+              'requestIdleCallback',
+            ],
+          },
+          // Common parameters
+          value: {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Primary Value',
+              },
+            },
+          },
+          options: {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Additional Options (JSON)',
+              },
+            },
+          },
+          // Specific additional parameters
+          url: {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'URL for Window Open',
+              },
+            },
+          },
+          target: {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Target for Window Open',
+              },
+            },
+          },
+          features: {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Window Features',
+              },
+            },
+          },
+        },
+        required: ['name', 'type'],
+      },
+      process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
+        try {
+          // Extract action type and parameters
+          // console.log;
+          const actionType = retrieveBody('', process.actionType, event, globalObj, paramState, sessionKey, process);
+          const value = retrieveBody('', process.value?.value, event, globalObj, paramState, sessionKey, process);
+          const optionsStr = retrieveBody('{}', process.options?.value, event, globalObj, paramState, sessionKey, process);
+          const url = retrieveBody('', process.url?.value, event, globalObj, paramState, sessionKey, process);
+          const target = retrieveBody('', process.target?.value, event, globalObj, paramState, sessionKey, process);
+          const features = retrieveBody('', process.features?.value, event, globalObj, paramState, sessionKey, process);
+
+          // Parse options
+          let options;
+          try {
+            options = typeof optionsStr === 'string' ? JSON.parse(optionsStr) : optionsStr;
+          } catch {
+            options = {};
+          }
+
+          let result;
+
+          switch (actionType) {
+            // Window Creation and Management
+            case 'open':
+              const newWindow = window.open(url || 'about:blank', target || '_blank', features || 'width=800,height=600');
+              result = {
+                success: !!newWindow,
+                message: newWindow ? 'Window opened' : 'Failed to open window',
+                windowName: newWindow?.name,
+              };
+              break;
+
+            case 'close':
+              window.close();
+              result = {
+                success: true,
+                message: 'Window closed',
+              };
+              break;
+
+            case 'print':
+              window.print();
+              result = {
+                success: true,
+                message: 'Print dialog opened',
+              };
+              break;
+
+            // Dialog Functions
+            case 'alert':
+              window.alert(value || 'Alert');
+              result = {
+                success: true,
+                message: 'Alert displayed',
+              };
+              break;
+
+            case 'confirm':
+              const confirmed = window.confirm(value || 'Are you sure?');
+              result = {
+                success: true,
+                confirmed: confirmed,
+              };
+              break;
+
+            case 'prompt':
+              const promptResponse = window.prompt(value || 'Enter value:', options?.defaultValue || '');
+              result = {
+                success: true,
+                value: promptResponse,
+              };
+              break;
+
+            // Window Resizing and Moving
+            case 'resize':
+              const width = parseInt(options?.width) || window.innerWidth;
+              const height = parseInt(options?.height) || window.innerHeight;
+              window.resizeTo(width, height);
+              result = {
+                success: true,
+                message: 'Window resized',
+                width: width,
+                height: height,
+              };
+              break;
+
+            case 'resizeBy':
+              const widthDelta = parseInt(options?.widthDelta) || 0;
+              const heightDelta = parseInt(options?.heightDelta) || 0;
+              window.resizeBy(widthDelta, heightDelta);
+              result = {
+                success: true,
+                message: 'Window resized by delta',
+                widthDelta: widthDelta,
+                heightDelta: heightDelta,
+              };
+              break;
+
+            case 'moveTo':
+              const x = parseInt(options?.x) || 0;
+              const y = parseInt(options?.y) || 0;
+              window.moveTo(x, y);
+              result = {
+                success: true,
+                message: 'Window moved',
+                x: x,
+                y: y,
+              };
+              break;
+
+            case 'moveBy':
+              const xDelta = parseInt(options?.xDelta) || 0;
+              const yDelta = parseInt(options?.yDelta) || 0;
+              window.moveBy(xDelta, yDelta);
+              result = {
+                success: true,
+                message: 'Window moved by delta',
+                xDelta: xDelta,
+                yDelta: yDelta,
+              };
+              break;
+
+            // Scrolling
+            case 'scroll':
+            case 'scrollTo':
+              const scrollX = parseInt(options?.x) || 0;
+              const scrollY = parseInt(options?.y) || 0;
+              window.scrollTo(scrollX, scrollY);
+              result = {
+                success: true,
+                message: 'Window scrolled',
+                x: scrollX,
+                y: scrollY,
+              };
+              break;
+
+            case 'scrollBy':
+              const scrollXDelta = parseInt(options?.xDelta) || 0;
+              const scrollYDelta = parseInt(options?.yDelta) || 0;
+              window.scrollBy(scrollXDelta, scrollYDelta);
+              result = {
+                success: true,
+                message: 'Window scrolled by delta',
+                xDelta: scrollXDelta,
+                yDelta: scrollYDelta,
+              };
+              break;
+
+            // Location Manipulation
+            case 'reload':
+              window.location.reload(options?.forceGet || false);
+              result = {
+                success: true,
+                message: 'Page reloaded',
+                forceGet: options?.forceGet || false,
+              };
+              break;
+
+            // Window Focus
+            case 'focus':
+              window.focus();
+              result = {
+                success: true,
+                message: 'Window focused',
+              };
+              break;
+
+            case 'blur':
+              window.blur();
+              result = {
+                success: true,
+                message: 'Window blurred',
+              };
+              break;
+
+            // Browser History
+            case 'back':
+              window.history.back();
+              result = {
+                success: true,
+                message: 'Navigated back',
+              };
+              break;
+
+            case 'forward':
+              window.history.forward();
+              result = {
+                success: true,
+                message: 'Navigated forward',
+              };
+              break;
+
+            case 'go':
+              const steps = parseInt(value) || -1;
+              window.history.go(steps);
+              result = {
+                success: true,
+                message: 'Navigated through history',
+                steps: steps,
+              };
+              break;
+
+            // Advanced Interactions
+            case 'postMessage':
+              const targetOrigin = options?.targetOrigin || '*';
+              const transferList = options?.transferList || [];
+              window.postMessage(value, targetOrigin, transferList);
+              result = {
+                success: true,
+                message: 'Message posted',
+                targetOrigin: targetOrigin,
+              };
+              break;
+
+            case 'openDialog':
+              // This is a bit tricky as it depends on browser support
+              const dialogElement = document.createElement('dialog');
+              dialogElement.innerHTML = value || 'Dialog Content';
+              document.body.appendChild(dialogElement);
+              dialogElement.showModal();
+              result = {
+                success: true,
+                message: 'Dialog opened',
+              };
+              break;
+
+            // Performance and Timing
+            case 'requestAnimationFrame':
+              const animationFrameId = window.requestAnimationFrame(() => {
+                // Placeholder for animation logic
+                console.log('Animation frame executed');
+              });
+              result = {
+                success: true,
+                message: 'Animation frame requested',
+                frameId: animationFrameId,
+              };
+              break;
+
+            case 'setTimeout':
+              const timeoutId = window.setTimeout(() => {
+                console.log('Timeout executed');
+              }, parseInt(value) || 1000);
+              result = {
+                success: true,
+                message: 'Timeout set',
+                timeoutId: timeoutId,
+                delay: parseInt(value) || 1000,
+              };
+              break;
+
+            case 'setInterval':
+              const intervalId = window.setInterval(() => {
+                console.log('Interval executed');
+              }, parseInt(value) || 1000);
+              result = {
+                success: true,
+                message: 'Interval set',
+                intervalId: intervalId,
+                interval: parseInt(value) || 1000,
+              };
+              break;
+
+            // Device and Screen
+            case 'matchMedia':
+              const mediaQuery = value || '(max-width: 600px)';
+              const mediaQueryList = window.matchMedia(mediaQuery);
+              result = {
+                success: true,
+                message: 'Media query matched',
+                matches: mediaQueryList.matches,
+                query: mediaQuery,
+              };
+              break;
+
+            // Security and Idle Callbacks
+            case 'requestIdleCallback':
+              const idleCallbackId = window.requestIdleCallback(
+                () => {
+                  console.log('Idle callback executed');
+                },
+                { timeout: parseInt(value) || 1000 }
+              );
+              result = {
+                success: true,
+                message: 'Idle callback requested',
+                callbackId: idleCallbackId,
+                timeout: parseInt(value) || 1000,
+              };
+              break;
+
+            default:
+              throw new Error(`Unsupported window action: ${actionType}`);
+          }
+
+          // Store the result in the global object
+          globalObj[process.name] = result;
+
+          return result;
+        } catch (error) {
+          // Handle errors
+          globalErrors[process.name] = {
+            error: error.message || 'Window action failed',
+            details: error,
+          };
+
+          console.error(`Window Action "${process.name}" Error:`, error);
+
+          return {
+            success: false,
+            error: error.message,
+          };
         }
       },
     },
@@ -1417,11 +1902,6 @@ export const statePlugin = {
             duration: requestDuration,
           };
 
-          // message.success(`Request completed: ${response.status} ${response.statusText} (${requestDuration}ms)`);
-
-          // Log the response to console for debugging
-          // console.log(`REST Request "${process.name}" Response:`, response);
-
           return {
             success: true,
             data: response.data,
@@ -1511,7 +1991,7 @@ export const statePlugin = {
           if (Object.keys(res.data.errors).length > 0) {
             // message.error(JSON.stringify(res.data.errors, null, 2));
           }
-          console.log(res.data.data);
+
           globalObj[process.name] = process?.returnKey
             ? getValueByPath(res.data.data, process?.returnKey)
             : {
@@ -1540,13 +2020,16 @@ export const statePlugin = {
             description: 'No spaces, caps ',
           },
           messageType: {
-            type: 'object',
-            properties: {
-              value: {
-                type: 'string',
-                title: 'Value',
-              },
-            },
+            enum: ['success', 'info', 'warning', 'error'],
+            type: 'string',
+            default: 'info',
+            // properties: {
+            //   value: {
+            //     type: 'string',
+            //     type: 'string',
+            //     title: 'Value',
+            //   },
+            // },
           },
           text: {
             type: 'object',
@@ -1562,7 +2045,7 @@ export const statePlugin = {
       },
       process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
         try {
-          const type = retrieveBody('', process.messageType?.value, event, globalObj, paramState, sessionKey, process);
+          const type = retrieveBody('', process.messageType, event, globalObj, paramState, sessionKey, process);
           const text = retrieveBody('', process.text?.value, event, globalObj, paramState, sessionKey, process);
           message[type || 'info'](text || 'message');
           globalObj[process.name] = {
@@ -1678,7 +2161,6 @@ export const statePlugin = {
       },
       process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
         try {
-          console.log(process);
           // message.info(process.compId);
           const currentParams = process?.keepCurrentQueryParams
             ? new URLSearchParams(window.location.search)
@@ -1711,8 +2193,6 @@ export const statePlugin = {
           if (process.isExternalPath) {
             window.location.href = process?.pageToNavigate;
           } else {
-            // message.warning(fullUrl);
-            console.log(process);
             !process.editMode && navigate(fullUrl);
           }
           globalObj[process.name] = {
@@ -1820,7 +2300,6 @@ export const statePlugin = {
           };
           // debug(globalObj);
           initJsonDebugStyles();
-          console.log(globalObj);
 
           // Replace with this simple call:
           logJsonDebug(globalObj, paramState, event, sessionKey, getUrlDetails, process);

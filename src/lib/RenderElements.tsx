@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { Col, Flex, Row } from 'antd';
+import { Col, Flex, Row, message } from 'antd';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { EVENT_HANDLERS } from './eventHandlersTypes';
@@ -118,8 +118,9 @@ const ElementItem = ({
   useEffect(() => {
     const generateState = async () => {
       // if (editMode) return;
+
       const pageState = {};
-      console.log(navigate);
+
       // if (editMode) return;
       const processItems = async () => {
         const overrides = item?.configuration?._overrides_ || [];
@@ -127,9 +128,12 @@ const ElementItem = ({
 
         await Promise.all(
           overrides.map(async (key) => {
-            // message.warning('jjjjjjjjjjj');
-            console.log(key);
+            //
+
             try {
+              if (isEmpty(key)) {
+                return;
+              }
               await processController(
                 key,
                 {},
@@ -143,7 +147,7 @@ const ElementItem = ({
                 tab,
                 (process) =>
                   renderElementUtil(
-                    { ...process, store },
+                    { ...process, store, allElements: elements },
                     elements,
                     setElementsToRender,
                     appState,
@@ -183,13 +187,13 @@ const ElementItem = ({
 
     return () => {};
   }, [
-    tab,
+    // tab,
     currentApplication?._id,
-    item,
-    window.location.search,
+    // item,
+    // window.location.search,
     elements,
-    editMode,
-    activeDrawingPathId,
+    // editMode,
+    // activeDrawingPathId,
     localStorage.getItem(currentApplication._id + '-' + 'sessionInfo'),
     // localStorage.getItem(currentApplication?._id + '-sessionInfo' || ''),
   ]);
@@ -205,13 +209,14 @@ const ElementItem = ({
     }
   }, [item.i, activeDrawingPathId, isDrawingPathActive]);
 
-  const renderItemWithData = (itemData = {}) => {
+  const renderItemWithData = () => {
     const viewTag = item?.configuration?.tag || 'div';
     item.configuration = {
       ...{
         ...item.configuration,
         backgroundImage: item.componentId === 'text' ? '' : item.configuration?.backgroundImage,
         background: item.componentId === 'text' ? '' : item.configuration?.background,
+        ...appState?.[tab]?.[item.i],
       },
       ...appState?.[tab]?.[item.i],
     };
@@ -220,6 +225,14 @@ const ElementItem = ({
       ...item?.style,
       ...flattenStyleObject(item?.configuration, item?.parent, item?.isChild),
       // backgroundColor: 'transparent',
+
+      // Properly handle background image URLs
+      ...(item.configuration?.backgroundImage && {
+        backgroundImage:
+          item.configuration.backgroundImage.startsWith('http') || item.configuration.backgroundImage.startsWith('data:')
+            ? `url(${item.configuration.backgroundImage})`
+            : item.configuration.backgroundImage,
+      }),
 
       // background: item.configuration?.backgroundImage ? item.configuration?.background : '',
       ...(isHovered &&
@@ -248,13 +261,12 @@ const ElementItem = ({
         }, 1);
       }
     };
-    // message.info(item.i);
 
     const baseProps = {
       key: item.i || index,
       id: item.i || index,
-      onMouseEnter: () => !readOnly && setisHovered(true), // Set isHovered to true on mouse enter
-      onMouseLeave: () => !readOnly && setisHovered(false), // Set isHovered to false on mouse leave
+      onMouseEnter: () => !readOnly && editMode && setisHovered(true), // Set isHovered to true on mouse enter
+      onMouseLeave: () => !readOnly && editMode && setisHovered(false), // Set isHovered to false on mouse leave
       onClick: (e) => {
         e.stopPropagation();
         if (item.componentId === 'drawpath' && isDrawingPathActive) {
@@ -295,23 +307,26 @@ const ElementItem = ({
          : ' cube active:cursor-grabbing '
      }
   `,
-      ...(editMode ? {} : { events: createEventHandlers(item, itemData) }),
-      ...(editMode ? {} : createEventHandlers(item, itemData)),
+      ...(editMode ? {} : { events: createEventHandlers(item) }),
+      ...(editMode ? {} : createEventHandlers(item)),
     };
 
     const props = {
-      ...baseProps,
-      ...{
-        // ...item.configuration,
-        backgroundImage: item.componentId === 'text' ? '' : item.configuration?.backgroundImage,
-        background: item.componentId === 'text' ? '' : item.configuration?.background,
-      },
-      ...baseProps.events,
-      ...appState?.[tab]?.[item.i],
-      // css: baseProps.style,
-      data: itemData,
+      ...flattenStyleObject({
+        ...baseProps,
+        ...{
+          // ...item.configuration,
+          backgroundImage: item.componentId === 'text' ? '' : item.configuration?.backgroundImage,
+          background: item.componentId === 'text' ? '' : item.configuration?.background,
+          ...appState?.[tab]?.[item.i],
+        },
+        ...baseProps.events,
+        ...appState?.[tab]?.[item.i],
+        // css: baseProps.style,
+        // data: itemData,
+      }),
     };
-    // console.log(props);
+
     if (editMode) {
       delete props.disabled;
       if (viewTag.toLowerCase() === 'button') {
@@ -339,6 +354,7 @@ const ElementItem = ({
         setAppStatePartial={setAppStatePartial}
         allComponentsRaw={allComponentsRaw}
         isWrapper={false}
+        appState={appState}
         setItemToEdit={setItemToEdit}
         elements={elements}
         parentId={item.i}
@@ -368,11 +384,12 @@ const ElementItem = ({
     ) : (
       renderComponent(item.componentId, {
         ...item,
-        data: itemData,
+        // data: itemData,
         isDrawingPathActive: item.i === activeDrawingPathId && isDrawingPathActive,
         setIsDrawingPathActive,
         activeDrawingPathId,
         setActiveDrawingPathId,
+        allComponentsRaw,
       })
     );
 
@@ -430,27 +447,6 @@ const ElementItem = ({
     );
   };
 
-  // Only check for dataSource if not in edit mode
-  if (!editMode) {
-    const mapElementsConfig = item?.configuration?._overrides_?.[0]?.plugins?.find((p) => p.type === 'ui-mapElements');
-    const dataSource = mapElementsConfig?.dataSource
-      ? retrieveBody('', mapElementsConfig.dataSource.value, {}, {}, {}, {})
-      : null;
-
-    // If we have a dataSource array and not in edit mode, map over it
-    if (Array.isArray(dataSource)) {
-      return (
-        <div id={item.i} style={{ display: 'contents' }}>
-          {dataSource.map((data, idx) => (
-            <div key={idx} id={item.i} style={{ display: 'contents' }}>
-              {renderItemWithData(data)}
-            </div>
-          ))}
-        </div>
-      );
-    }
-  }
-
   // If in edit mode or no dataSource, render single element
   return renderItemWithData();
 };
@@ -474,7 +470,7 @@ const ElementRenderer = ({
   currentApplication,
   parentStyle,
   setAppStatePartial,
-  tab,
+  // tab,
   navigate,
   AntDesign,
   appState,
@@ -492,12 +488,14 @@ const ElementRenderer = ({
   setSessionInfo,
   storeInvocation,
   allComponentsRaw = [],
+  tab,
 }) => {
   const [elementsToRender, setElementsToRender] = useState(elements);
 
-  const createEventHandler = (e, processToRun, elementId, renderElementUtil) => {
+  const createEventHandler = (e, processToRun, elementId) => {
     // message.success(elementId);
     // console.log
+
     return processController(
       processToRun || [],
       e || {},
@@ -524,6 +522,7 @@ const ElementRenderer = ({
   const createEventHandlers = (item, renderElementUtil) => {
     // console.log(data, item);
     // message.warning(item.i);
+    // message.warning('jjjjjjjjjjj');
     const handlers = {};
 
     Object.keys(EVENT_HANDLERS).forEach((eventName) => {
@@ -547,10 +546,10 @@ const ElementRenderer = ({
               // e.preventDefault();
 
               // return {};
-              return createEventHandler(e, configHandler, item.i, renderElementUtil);
+              return createEventHandler(e, configHandler, item.i);
             };
           }
-          return createEventHandler(e, configHandler, item.i, renderElementUtil);
+          return createEventHandler(e, configHandler, item.i);
         };
       }
     });
@@ -572,6 +571,7 @@ const ElementRenderer = ({
         await Promise.all(
           overrides.map(async (key) => {
             try {
+              // return;
               await processController(
                 key,
                 {},
@@ -655,7 +655,7 @@ const ElementRenderer = ({
     // dispatch(setCurrentApp({}));
     setallComponents(processedComponents);
     // fetchApp2();
-    console.log(processedComponents);
+
     () => {
       // dispatch(setCurrentApp({}));
     };
@@ -789,7 +789,7 @@ const ElementRenderer = ({
         );
       }
       const Component = componentsMap?.[id];
-      console.log(componentsMap, id);
+
       if (props.componentId === 'canvas') {
         return <></>;
       }
@@ -801,11 +801,20 @@ const ElementRenderer = ({
         editMode: editMode,
         item: {
           meta: props,
+          config: {
+            allComponents,
+            allComponentsRaw,
+            tab,
+            store,
+            createEventHandler,
+            createEventHandlers,
+            id,
+          },
         },
         configuration: props.configuration,
         ...props,
       });
-
+      // return <></>;
       return RenderedComponent?.type
         ? React.createElement(RenderedComponent.type, {
             ...RenderedComponent.props,
@@ -819,7 +828,7 @@ const ElementRenderer = ({
     return uniqueElements
       .filter((item) => item.parent === parentId && item.i)
       .map((item, index) => (
-        <ErrorBoundary fallback={<p>You can provide a custom fallback component here</p>}>
+        <ErrorBoundary key={item?.i} fallback={<p>You can provide a custom fallback component here</p>}>
           <ElementItem
             setItemToEdit={setItemToEdit}
             store={store}
@@ -882,7 +891,7 @@ const ElementRenderer = ({
     AntDesign,
     ReactJson,
   ]);
-  console.log(allComponentsRaw);
+
   return (
     <>
       {isWrapper ? (

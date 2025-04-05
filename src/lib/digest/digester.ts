@@ -1,7 +1,23 @@
 import _ from 'lodash';
 import { nativePlugins } from './state/nativeSteps';
 import { statePlugin } from './state/actions';
+import { tempStore } from './tempStore';
 
+export const generatePluginKey = (plugins) => {
+  if (!plugins || plugins.length === 0) {
+    return 'no-plugins';
+  }
+
+  // Create a string representing the plugin configuration
+  // For each plugin, use its type and id (if available) to create a unique identifier
+  return plugins
+    ?.map((plugin) => {
+      const pluginId = plugin.id || '';
+      const pluginType = plugin.type || '';
+      return `${pluginType}-${pluginId}`;
+    })
+    .join('_');
+};
 const operationsCache = new Map();
 let allOperations = null;
 const getOperations = () => {
@@ -165,6 +181,29 @@ export const processController = async (
   // return;
   stateManager.reset();
   const plugins = controllerToExecute?.plugins || [];
+
+  // Create a unique key for this controller execution
+  const pluginKey = generatePluginKey(plugins);
+  const controllerKey = `${pluginKey}`;
+
+  function getCircularReplacer() {
+    const seen = new WeakSet();
+    return (key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return '[Circular Reference]';
+        }
+        seen.add(value);
+      }
+      return value;
+    };
+  }
+
+  const stringified = JSON.stringify(event, getCircularReplacer());
+
+  // Store the event
+  tempStore.storeEvent(controllerKey, stringified);
+
   try {
     const result = await executeProcess(
       0,
@@ -181,9 +220,16 @@ export const processController = async (
       config
     );
 
+    // Store the result
+    tempStore.storeResult(controllerKey, result);
+    const allResults = tempStore.getAllResults();
+    const allEvents = tempStore.getAllEvents();
+
     return result;
   } catch (error) {
     console.error('Process controller error:', error);
+    // Optionally store errors as well
+    tempStore.storeResult(controllerKey, { error: error.message });
     throw error;
   }
 };

@@ -1,4 +1,5 @@
 import _ from 'lodash';
+import { message } from 'antd';
 
 export function isEmpty(obj) {
   return Object.keys(obj).length === 0;
@@ -245,20 +246,6 @@ function deepParse(input, req = {}, controllers = {}, sessionInfo) {
       return input;
     } else {
       let parsedFunction;
-      const invokeController = async (body) => {
-        const callInternalRoute = async () => {
-          try {
-            const newReq = req;
-            newReq.body = body;
-            const id = (req.requestId = uuidv4());
-          } catch (error) {
-            return {
-              error,
-            };
-          }
-        };
-        return await callInternalRoute();
-      };
       const result = parsedFunction(sessionInfo, state);
       return result;
     }
@@ -484,102 +471,346 @@ export function dotNotationKeysToObject(obj) {
 }
 export const getUrlDetails = (paramss = {}) => {
   const params = { ...paramss };
-  const fullUrl = window.location.href;
-  const pathname = window.location.pathname;
-  const searchParams = new URLSearchParams(window.location.search);
-  const searchParamsObject = Object.fromEntries(searchParams.entries());
-  const hash = window.location.hash;
-  // const currentView = {
-  //   ...store.getState()?.currentAppState?.currentApplication?.views?.find((view) => view.id === pathname.split('/')[4]),
-  // };
-  // delete currentView.layout;
-  delete params?.id;
-  delete params?.tab;
-  delete params?.setting;
+  // let publicIP = null;
+  const getPublicIP = () => {
+    return new Promise((resolve) => {
+      fetch('https://api.ipify.org?format=json')
+        .then((response) => response.json())
+        .then((data) => resolve(data.ip))
+        .catch((error) => {
+          console.warn('Could not retrieve public IP:', error);
+          resolve(null);
+        });
+    });
+  };
+  // Breakpoint Calculations
+  const breakpoints = {
+    xs: 480,
+    sm: 640,
+    md: 768,
+    lg: 1024,
+    xl: 1280,
+    '2xl': 1536,
+  };
+
+  const getCurrentBreakpoint = () => {
+    const width = window.innerWidth;
+    if (width < breakpoints.xs) return 'xs';
+    if (width < breakpoints.sm) return 'sm';
+    if (width < breakpoints.md) return 'md';
+    if (width < breakpoints.lg) return 'lg';
+    if (width < breakpoints.xl) return 'xl';
+    return '2xl';
+  };
+
+  // Comprehensive data collection
   return {
-    fullUrl,
-    pathname,
-    // currentView,
-    searchParams: searchParamsObject,
-    params,
-    hash,
+    // URL Information
+    url: {
+      fullUrl: window.location.href,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+      origin: window.location.origin,
+      protocol: window.location.protocol,
+      host: window.location.host,
+      hostname: window.location.hostname,
+      port: window.location.port,
+      searchParams: Object.fromEntries(new URLSearchParams(window.location.search).entries()),
+      params: (() => {
+        const paramsCopy = { ...paramss };
+        delete paramsCopy?.id;
+        delete paramsCopy?.tab;
+        delete paramsCopy?.setting;
+        return paramsCopy;
+      })(),
+    },
+
+    // Responsive Design Information
+    responsive: {
+      breakpoints,
+      currentBreakpoint: getCurrentBreakpoint(),
+      screenSize: {
+        width: window.screen.width,
+        height: window.screen.height,
+        availWidth: window.screen.availWidth,
+        availHeight: window.screen.availHeight,
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        outerWidth: window.outerWidth,
+        outerHeight: window.outerHeight,
+      },
+      orientation: window.screen.orientation ? window.screen.orientation.type : null,
+      aspectRatio: window.innerWidth / window.innerHeight,
+      isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+      isTablet: /(tablet|ipad|playbook|silk)|(android(?!.*mobile))/i.test(navigator.userAgent),
+    },
+
+    // Device Capabilities
+    device: {
+      pixelRatio: window.devicePixelRatio,
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      maxTouchPoints: navigator.maxTouchPoints,
+      touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+      isStandalone: window.matchMedia('(display-mode: standalone)').matches,
+
+      // Input Capabilities
+      pointerType: {
+        hasTouch: navigator.maxTouchPoints > 0,
+        hasMouse: window.matchMedia('(pointer: fine)').matches,
+        hasStylus: navigator.maxTouchPoints > 1,
+      },
+    },
+
+    // Browser Information
+    browser: {
+      userAgent: navigator.userAgent,
+      appName: navigator.appName,
+      appVersion: navigator.appVersion,
+      language: navigator.language,
+      languages: navigator.languages,
+      platform: navigator.platform,
+      product: navigator.product,
+      productSub: navigator.productSub,
+      vendor: navigator.vendor,
+
+      // Capabilities
+      cookieEnabled: navigator.cookieEnabled,
+      doNotTrack: navigator.doNotTrack,
+      onLine: navigator.onLine,
+
+      // Rendering and Compatibility
+      colorDepth: screen.colorDepth,
+      pixelDepth: screen.pixelDepth,
+    },
+
+    // Performance and Timing
+    performance: {
+      timeOrigin: window.performance.timeOrigin,
+      timing: window.performance.timing,
+      navigation: window.performance.navigation,
+      memory: window.performance.memory || null,
+    },
+
+    // Network Information
+    network: {
+      // ipAddress: getPublicIP(),
+      connection: navigator.connection
+        ? {
+            type: navigator.connection.type,
+            effectiveType: navigator.connection.effectiveType,
+            downlinkMax: navigator.connection.downlinkMax,
+            saveData: navigator.connection.saveData,
+          }
+        : null,
+
+      // Additional Network Details
+      protocols: {
+        http: window.location.protocol === 'http:',
+        https: window.location.protocol === 'https:',
+        webSocket: 'WebSocket' in window,
+      },
+    },
+
+    // Metadata Collection
+    metadata: {
+      // Collect all meta tags
+      metaTags: Array.from(document.getElementsByTagName('meta')).reduce((acc, meta) => {
+        const name = meta.getAttribute('name');
+        const property = meta.getAttribute('property');
+        const content = meta.getAttribute('content');
+
+        if (name) acc[`name_${name}`] = content;
+        if (property) acc[`property_${property}`] = content;
+
+        return acc;
+      }, {}),
+
+      // Document Information
+      document: {
+        title: document.title,
+        domain: document.domain,
+        URL: document.URL,
+        characterSet: document.characterSet,
+        contentType: document.contentType,
+        readyState: document.readyState,
+        referrer: document.referrer,
+        lastModified: document.lastModified,
+      },
+    },
+
+    // Environment and Context
+    environment: {
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      locales: navigator.languages,
+
+      // Storage Capabilities
+      storage: {
+        localStorageAvailable: (() => {
+          try {
+            localStorage.setItem('test', 'test');
+            localStorage.removeItem('test');
+            return true;
+          } catch (e) {
+            return false;
+          }
+        })(),
+        sessionStorageAvailable: (() => {
+          try {
+            sessionStorage.setItem('test', 'test');
+            sessionStorage.removeItem('test');
+            return true;
+          } catch (e) {
+            return false;
+          }
+        })(),
+      },
+    },
   };
 };
-export const retrieveBody = (type, value, event, globalObj, paramState, key, process) => {
-  const newValue = deepParse(value, event, globalObj || {}, JSON.parse(localStorage.getItem(key || '') || '{}'));
-  const state = process?.store?.getState();
-  let newBody = {};
-  let localStore;
+
+// Utility function to get IP (requires external service)
+export const getPublicIP = async () => {
   try {
-    const storedValue = localStorage.getItem(key || '');
-    localStore = storedValue ? JSON.parse(storedValue) : {};
-  } catch (error) {
-    console.error('Error parsing localStorage item:', error);
-    localStore = {};
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch {
+    return null;
   }
-  const fullUrl = window.location.href;
-  const pathname = window.location.pathname?.split('/');
-  const searchParams = new URLSearchParams(window.location.search);
-  const searchParamsObject = Object.fromEntries(searchParams.entries());
-  console.log(typeof newValue, newValue, value, searchParamsObject);
-  if (typeof newValue === 'string' && newValue?.startsWith('{{self.')) {
-    // message.warning('done');
-    const cleanPath = newValue
-      ?.replace(/{{self\./g, '')
-      .replace(/}}/g, '')
-      .trim();
+};
+export const retrieveBody = (type, value, event, globalObj, paramState, key, process) => {
+  // Helper function to recursively resolve values
+  const resolveValue = (val) => {
+    if (typeof val !== 'object' || val === null) {
+      // Base case: If it's a primitive value or string pattern, process it
+      if (typeof val === 'string') {
+        return processSingleValue(val, event, globalObj, process, paramState);
+      }
+      return val;
+    }
 
-    // Split the path into parts in case of nested properties
-    const parts = cleanPath.split('.');
+    // Handle arrays
+    if (Array.isArray(val)) {
+      return val.map((item) => resolveValue(item));
+    }
 
-    // Get the base object - if compId is missing, just use state.appState[pathname[0]]
-    let result = process?.compId ? state?.appState?.[pathname[1]]?.[process.compId] : state?.appState?.[pathname[1]];
-
-    console.log(state?.appState[pathname[1]]?.[process.compId], cleanPath);
-
-    // Handle multi-level property access by traversing the object
-    if (result && parts.length) {
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-
-        // Check if this part contains an array index notation
-        const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
-
-        if (arrayMatch) {
-          // Extract the property name and array index
-          const [, propName, indexStr] = arrayMatch;
-          const index = parseInt(indexStr, 10);
-
-          // First access the property, then the array index
-          result = result?.[propName]?.[index];
-        } else {
-          // Normal property access
-          result = result?.[part];
-        }
-
-        // If we hit undefined/null at any point in the traversal, return it immediately
-        if (result === undefined || result === null) {
-          return result;
-        }
+    // Handle objects - recursively process each property
+    const result = {};
+    for (const prop in val) {
+      if (Object.prototype.hasOwnProperty.call(val, prop)) {
+        result[prop] = resolveValue(val[prop]);
       }
     }
-    console.log(result);
     return result;
-  }
-  // console.lo
-  newBody = secureInterpolate(newValue, {
-    event: event,
-    history: getUrlDetails(paramState),
-    localStore: localStore,
-    state: dotNotationKeysToObject(state?.appState || {}),
-    controller: dotNotationKeysToObject(globalObj || {}),
-  });
-  // console.log(newBody, newValue, {
-  //   event: event,
-  //   // history: getUrlDetails(paramState),
-  //   localStore: localStore,
-  //   state: dotNotationKeysToObject(state.appState || {}),
-  //   controller: dotNotationKeysToObject(globalObj || {}),
-  // });
-  return newBody;
+  };
+
+  // Function to process a single string value
+  const processSingleValue = (newValue, event, globalObj, process, paramState) => {
+    if (typeof newValue !== 'string') return newValue;
+
+    const state = process?.store?.getState();
+    let localStore;
+
+    try {
+      const storedValue = localStorage.getItem(key || '');
+      localStore = storedValue ? JSON.parse(storedValue) : {};
+    } catch (error) {
+      console.error('Error parsing localStorage item:', error);
+      localStore = {};
+    }
+
+    // Handle different path patterns
+    if (
+      newValue?.startsWith('{{self.') ||
+      newValue?.startsWith('{{element.') ||
+      newValue?.startsWith('{{styleKeys.') ||
+      newValue?.startsWith('{{antComponentKeys.') ||
+      newValue?.startsWith('{{tagKeys.')
+    ) {
+      // Determine the prefix type
+      let prefix = '';
+      if (newValue?.startsWith('{{self.')) prefix = 'self';
+      else if (newValue?.startsWith('{{element.')) prefix = 'element';
+      else if (newValue?.startsWith('{{styleKeys.')) prefix = 'styleKeys';
+      else if (newValue?.startsWith('{{antComponentKeys.')) prefix = 'antComponentKeys';
+      else if (newValue?.startsWith('{{tagKeys.')) prefix = 'tagKeys';
+
+      // Extract the path without the prefix
+      const cleanPath = newValue
+        ?.replace(new RegExp(`{{${prefix}\\.`, 'g'), '')
+        .replace(/}}/g, '')
+        .trim();
+
+      // Special handling for tagKeys - extract only the third part
+      if (prefix === 'tagKeys' || prefix === 'antComponentKeys') {
+        const parts = cleanPath.split('.');
+        if (parts.length >= 3) {
+          return parts[2]; // Return the third part (index 2)
+        } else if (parts.length === 2) {
+          return parts[1]; // Return the second part if only two exist
+        } else {
+          return cleanPath; // Return as is if not enough parts
+        }
+      }
+
+      // For element and styleKeys, return just the path as is
+      if (prefix === 'element' || prefix === 'styleKeys') {
+        return cleanPath;
+      }
+
+      // For self, use the existing object traversal logic
+      if (prefix === 'self') {
+        // Split the path into parts in case of nested properties
+        const parts = cleanPath.split('.');
+
+        // Get the base object - if compId is missing, just use state.appState[process?.pageId]
+        let result = process?.compId
+          ? state?.appState?.[process?.pageId]?.[process.compId]
+          : state?.appState?.[process?.pageId];
+
+        // Handle multi-level property access by traversing the object
+        if (result && parts.length) {
+          for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+
+            // Check if this part contains an array index notation
+            const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+
+            if (arrayMatch) {
+              // Extract the property name and array index
+              const [, propName, indexStr] = arrayMatch;
+              const index = parseInt(indexStr, 10);
+
+              // First access the property, then the array index
+              result = result?.[propName]?.[index];
+            } else {
+              // Normal property access
+              result = result?.[part];
+            }
+
+            // If we hit undefined/null at any point in the traversal, return it immediately
+            if (result === undefined || result === null) {
+              return result;
+            }
+          }
+        }
+
+        return result;
+      }
+    }
+
+    // Handle non-pattern string values with secureInterpolate
+    return secureInterpolate(newValue, {
+      event: event,
+      window: getUrlDetails(paramState),
+      localStore: localStore,
+      state: dotNotationKeysToObject(state?.appState || {}),
+      controller: dotNotationKeysToObject(globalObj || {}),
+    });
+  };
+
+  // Start the recursive resolution process
+  const parsedValue = deepParse(value, event, globalObj || {}, JSON.parse(localStorage.getItem(key || '') || '{}'));
+  return resolveValue(parsedValue);
 };

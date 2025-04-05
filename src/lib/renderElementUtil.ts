@@ -1,6 +1,7 @@
-// import { extractValue } from './utils';
-
+import { message } from 'antd';
 import { retrieveBody } from './digest/state/utils';
+
+// import { extractValue } from './utils';
 
 // import { retrieveBody } from './digest/state/utils';
 
@@ -36,7 +37,7 @@ const renderElementUtil = (
 
   // Handle renderInto type
   if (process?.propsMapper?.renderType === 'renderInto') {
-    const newElementId = `${targetElement}-${process?.propsMapper.blueprint}-virtual-${process?.currentIndex}`;
+    const newElementId = `virtual-${process?.currentIndex}`;
 
     // Skip if element already exists
     if (elements?.find((el) => el.i === newElementId)) {
@@ -46,7 +47,7 @@ const renderElementUtil = (
     setElementsToRender((prevElements) => {
       // Find the parent element that we're rendering into
       const parentElementIndex = prevElements.findIndex((el) => el.i === targetElement);
-
+      // message.info('newChildId');
       if (parentElementIndex === -1) {
         console.error('Parent element not found');
         return prevElements;
@@ -69,30 +70,65 @@ const renderElementUtil = (
           return [];
         }
 
-        console.log(process.store);
         const childElements = prevElements.filter((el) => el.parent === originalId);
+        // console.log
         return childElements
           .map((childd) => {
             const child = { ...childd };
-            let newChildId = `${newParentId}-child-${child.i}`;
 
+            let newChildId = `${newParentId}-child-${child.i}`;
             dispatch(
               setAppStatePartial({
                 key: tab + '.' + newChildId,
                 payload: process.currentItem,
               })
             );
-
             Object.keys(process?.propsMapper?.defaults || {})?.map((key) => {
-              dispatch(
-                setAppStatePartial({
-                  key: tab + '.' + newChildId + '.' + defaults?.[key]?.targetField,
-                  payload: retrieveBody(null, defaults?.[key]?.value, {}, {}, {}, 'key', {
-                    compId: newChildId,
-                    store: process?.store,
-                  }),
-                })
-              );
+              // console.log(mapItem?.value);
+              if (process?.propsMapper?.defaults[key]?.element === childd?.i) {
+                dispatch(
+                  setAppStatePartial({
+                    key: tab + '.' + newChildId + '.' + defaults?.[key]?.targetField,
+                    payload: retrieveBody(
+                      null,
+                      process?.propsMapper?.defaults[key]?.value,
+                      process?.event,
+                      process?.globalObj,
+                      process?.paramState,
+                      process?.sessionKey,
+                      {
+                        compId: newChildId,
+                        store: process?.store,
+                        pageId: tab,
+                      }
+                    ),
+                  })
+                );
+              }
+            });
+            propsMap?.map((mapItem) => {
+              if (mapItem?.element === childd?.i) {
+                // message.info(newChildId);
+
+                dispatch(
+                  setAppStatePartial({
+                    key: tab + '.' + newChildId + '.' + mapItem?.field,
+                    payload: retrieveBody(
+                      null,
+                      mapItem?.value,
+                      process?.event,
+                      process?.globalObj,
+                      process?.paramState,
+                      process?.sessionKey,
+                      {
+                        compId: newChildId,
+                        pageId: tab,
+                        store: process?.store,
+                      }
+                    ),
+                  })
+                );
+              }
             });
 
             const processedChild = {
@@ -129,6 +165,7 @@ const renderElementUtil = (
         children: allChildren.filter((child) => child.parent === newElementId).map((child) => child.i),
       };
 
+      // Add this after creating the newElement
       setAppStatePartial &&
         dispatch(
           setAppStatePartial({
@@ -137,21 +174,54 @@ const renderElementUtil = (
           })
         );
 
+      // Process default values for the parent
       setAppStatePartial &&
-        Object.keys(process?.propsMapper?.defaults || {})?.map((key) => {
+        Object.keys(process?.propsMapper?.defaults || {})?.forEach((key) => {
           if (process?.propsMapper?.blueprint === defaults?.[key]?.element) {
             dispatch(
               setAppStatePartial({
                 key: tab + '.' + newElementId + '.' + defaults?.[key]?.targetField,
-                payload: retrieveBody(null, defaults?.[key]?.value, {}, {}, {}, 'key', {
-                  compId: newElementId,
-                  store: process?.store,
-                }),
+                payload: retrieveBody(
+                  null,
+                  defaults?.[key]?.value,
+                  process?.event,
+                  process?.globalObj,
+                  process?.paramState,
+                  process?.sessionKey,
+                  {
+                    compId: newElementId,
+                    store: process?.store,
+                    pageId: tab,
+                  }
+                ),
               })
             );
           }
         });
 
+      // Also process mappings for the parent element
+      propsMap?.forEach((mapItem) => {
+        if (mapItem?.element === process?.propsMapper?.blueprint) {
+          dispatch(
+            setAppStatePartial({
+              key: tab + '.' + newElementId + '.' + mapItem?.field,
+              payload: retrieveBody(
+                null,
+                mapItem?.value,
+                process?.event,
+                process?.globalObj,
+                process?.paramState,
+                process?.sessionKey,
+                {
+                  compId: newElementId,
+                  pageId: tab,
+                  store: process?.store,
+                }
+              ),
+            })
+          );
+        }
+      });
       // Add the new element and all its children to the updated elements array
       updatedElements.push(newElement, ...allChildren);
       return updatedElements;
@@ -160,23 +230,54 @@ const renderElementUtil = (
 
   // Handle inject type
   if (process?.propsMapper?.renderType === 'inject') {
+    // message.info('jj');
     const defaultValues = process?.propsMapper?.defaults;
 
-    setAppStatePartial &&
-      Object.keys(process?.propsMapper?.defaults || {})?.map((key) => {
-        dispatch(
-          setAppStatePartial({
-            key: tab + '.' + defaultValues?.[key]?.element + '.' + defaultValues?.[key]?.targetField,
-            payload:
-              extractValue(appState?.[tab]?.[defaultValues?.[key]?.element], defaultValues?.[key]?.value) ||
-              defaultValues?.[key]?.value,
-          })
-        );
-      });
+    // Object.keys(defaultValues || {})?.map((key) => {
+    //   console.log(defaultValues[key]?.element + '.' + defaultValues?.[key]?.targetField);
+    //   dispatch(
+    //     setAppStatePartial({
+    //       key: tab + '.' + defaultValues[key]?.element + '.' + defaultValues?.[key]?.targetField,
+    //       payload: retrieveBody(
+    //         null,
+    //         defaultValues[key]?.value,
+    //         process?.event,
+    //         process?.globalObj,
+    //         process?.paramState,
+    //         process?.sessionKey,
+    //         {
+    //           compId: defaultValues[key]?.element,
+    //           store: process?.store,
+    //         }
+    //       ),
+    //     })
+    //   );
+    // });
 
+    propsMap?.map((mapItem) => {
+      dispatch(
+        setAppStatePartial({
+          key: tab + '.' + mapItem?.element + '.' + mapItem?.field,
+          // payload: mapItem?.value,
+          payload: retrieveBody(
+            null,
+            mapItem?.value,
+            process?.event,
+            process?.globalObj,
+            process?.paramState,
+            process?.sessionKey,
+            {
+              compId: mapItem?.element,
+              store: process?.store,
+              pageId: tab,
+            }
+          ),
+        })
+      );
+    });
     setAppStatePartial &&
       propsMap?.map((mapItem) => {
-        if (mapItem?.injectData) {
+        if (process?.currentItem) {
           dispatch(
             setAppStatePartial({
               key: tab + '.' + mapItem?.element,
@@ -185,13 +286,7 @@ const renderElementUtil = (
           );
         }
 
-        setAppStatePartial &&
-          dispatch(
-            setAppStatePartial({
-              key: tab + '.' + mapItem?.element + '.' + mapItem?.field,
-              payload: extractValue(appState?.[tab]?.[mapItem?.element], mapItem?.value) || mapItem?.value,
-            })
-          );
+        // setAppStatePartial && dispatch();
       });
   }
 };

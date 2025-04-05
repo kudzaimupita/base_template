@@ -5,9 +5,10 @@ import React from 'react';
 import ReactJson from 'react-json-view';
 import { notification } from 'antd';
 
-// Keep track of active notifications
+// Track the current active notification
 let notificationCounter = 0;
-const activeNotifications: string[] = [];
+let activeNotificationId: string | null = null;
+let activeNotificationData: Record<string, any> | null = null;
 
 // Custom notification component with ReactJson
 const JsonDebugContent: React.FC<{
@@ -57,19 +58,59 @@ const JsonDebugContent: React.FC<{
   );
 };
 
+// Deep equality function to compare objects
+function isEqual(obj1: any, obj2: any): boolean {
+  if (obj1 === obj2) return true;
+
+  if (typeof obj1 !== 'object' || obj1 === null || typeof obj2 !== 'object' || obj2 === null) {
+    return obj1 === obj2;
+  }
+
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) return false;
+
+  for (const key of keys1) {
+    if (!keys2.includes(key) || !isEqual(obj1[key], obj2[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
  * Show a debug notification with ReactJson view
+ * Only shows one notification at a time, replacing any existing one
+ * Skips rendering if data is identical to currently displayed notification
  */
 export function showJsonDebug(data: Record<string, any>, title: string = 'Debug'): void {
+  // Check if identical data is already being displayed
+  if (activeNotificationData && isEqual(activeNotificationData, data)) {
+    // Data is the same, don't rerender
+    const element = document.querySelector('.json-debug-notification');
+    if (element) {
+      // Add a blink effect to draw attention to the existing notification
+      element.classList.add('blink-notification');
+      setTimeout(() => {
+        element.classList.remove('blink-notification');
+      }, 1000);
+    }
+    return;
+  }
+
+  // If there's an active notification, close it first
+  if (activeNotificationId) {
+    notification.close(activeNotificationId);
+  }
+
+  // Create new notification since data is different
   const id = `debug-${++notificationCounter}`;
 
-  // Close all existing notifications
-  activeNotifications.forEach((existingId) => {
-    // notification?.close(existingId);
-  });
-
-  // Add this notification to the active list
-  activeNotifications.push(id);
+  // Update active notification tracking
+  activeNotificationId = id;
+  activeNotificationData = data;
 
   // Configure notification without the default icon
   notification.open({
@@ -95,18 +136,6 @@ export function showJsonDebug(data: Record<string, any>, title: string = 'Debug'
         >
           {title}
         </span>
-        {/* <span
-          style={{
-            fontSize: '9px',
-            backgroundColor: '#1e40af',
-            color: '#93c5fd',
-            padding: '1px 5px',
-            borderRadius: '4px',
-            right: '30px',
-          }}
-        >
-          #{notificationCounter}
-        </span> */}
       </div>
     ),
     description: <JsonDebugContent data={data} />,
@@ -124,10 +153,10 @@ export function showJsonDebug(data: Record<string, any>, title: string = 'Debug'
     closable: true,
     duration: 0, // Never auto-close
     onClose: () => {
-      // Remove from active notifications on close
-      const index = activeNotifications.indexOf(id);
-      if (index > -1) {
-        activeNotifications.splice(index, 1);
+      // Reset active notification tracking when closed
+      if (activeNotificationId === id) {
+        activeNotificationId = null;
+        activeNotificationData = null;
       }
     },
   });
@@ -149,6 +178,7 @@ export function logJsonDebug(
 
   const sessionInfo = sessionKey ? localStorage.getItem(sessionKey + '-sessionInfo') : '{}';
   const parsedSessionInfo = tryParseJSON(sessionInfo);
+
   function getCircularReplacer() {
     const seen = new WeakSet();
     return (key, value) => {
@@ -163,17 +193,16 @@ export function logJsonDebug(
   }
 
   const stringified = JSON.stringify(event, getCircularReplacer());
-  console.log(stringified, JSON.parse(stringified));
-  showJsonDebug(
-    {
-      controller: globalObj,
-      history: getUrlDetails(paramState),
-      event: JSON.parse(stringified),
-      state: parsedState,
-      sessionInfo: parsedSessionInfo,
-    },
-    process.name || 'Workflow Debug'
-  );
+
+  const debugData = {
+    controller: globalObj,
+    history: getUrlDetails(paramState),
+    event: JSON.parse(stringified),
+    state: parsedState,
+    sessionInfo: parsedSessionInfo,
+  };
+
+  showJsonDebug(debugData, process.name || 'Workflow Debug');
 }
 
 // Helper function to safely parse JSON
@@ -205,6 +234,15 @@ export function initJsonDebugStyles(): void {
     .json-debug-notification .ant-notification-notice-with-icon .ant-notification-notice-message,
     .json-debug-notification .ant-notification-notice-with-icon .ant-notification-notice-description {
       margin-left: 0 !important;
+    }
+    @keyframes blink-notification {
+      0% { border-color: #262626; }
+      50% { border-color: #3b82f6; }
+      100% { border-color: #262626; }
+    }
+    .blink-notification {
+      animation: blink-notification 0.6s ease-in-out 3;
+      border: 1px solid #3b82f6 !important;
     }
   `;
   document.head.appendChild(styleEl);

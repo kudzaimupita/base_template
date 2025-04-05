@@ -224,6 +224,7 @@ export const nativePlugins = {
         const processes = process.sequence || [];
         list = retrieveBody('', process?.list?.value, event, globalObj, paramState, sessionKey, process);
         const data = list;
+
         const res = [];
         if (!_.isArray(data)) {
           console.error(`Invalid list ${JSON.stringify(list)}`);
@@ -233,7 +234,6 @@ export const nativePlugins = {
         try {
           async function processData() {
             try {
-              console.log(process?.renderElementUtil);
               const results = await Promise.all(
                 data?.map(async (item, index) => {
                   try {
@@ -244,8 +244,6 @@ export const nativePlugins = {
                     const result = await executeProcess(
                       0,
                       processes.map((processItem) => {
-                        // message.warning();
-                        console.log(process, processItem);
                         return {
                           ...processItem,
                           name: `${process.name}.${processItem.name}`,
@@ -7953,8 +7951,7 @@ export const nativePlugins = {
         if (process?.conditions && !condition) {
           for (const item of process.conditions) {
             const checkIfTrue = retrieveBody('', item?.value?.value, event, globalObj, paramState, sessionKey, process);
-            // message.info(item?.value?.value);
-            // console.log(item?.value?.value, checkIfTrue, item.key, 'condition');
+
             if (checkIfTrue) {
               condition = item.key;
               break; // Exit the loop
@@ -7965,7 +7962,7 @@ export const nativePlugins = {
         // const processes = process.branches?.[condition] || [];
         const processes = process.branches?.[condition] || [];
         // message.info()
-        console.log(process);
+
         try {
           await executeProcess(
             0,

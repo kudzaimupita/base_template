@@ -2,20 +2,18 @@
 
 import * as AntCharts from '@ant-design/plots';
 import * as AntDesign from 'antd';
+import * as MUI from '@mui/material';
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-// import AntIcon from './IconView';
 import { ErrorBoundary } from 'react-error-boundary';
 import FormSc from '@rjsf/antd';
-import { debounce } from 'lodash';
 import defaults from 'json-schema-defaults';
-import { processController } from './digest/digester';
+import { genericEventHandlers } from './eventHandlers';
 import { useSelector } from 'react-redux';
 
-// import { processController } from '../components/Views/digest/digester';
-// import validator from '@rjsf/validator-ajv8';
+// import * as MuiIcons from '@mui/icons-material';
 
 const JsxParser = React.lazy(() => import('react-jsx-parser'));
 const fallbackRender = ({ error }) => (
@@ -33,74 +31,15 @@ const fallbackRender = ({ error }) => (
 ('tets');
 
 const MyComponent = (props) => {
-  const currentApplication = useSelector((state: any) => state.currentAppState.currentApplication);
-  const component = props.allComponentsRaw?.find((item) => item._id === props.meta?.componentId);
+  const component = props?.meta?.config?.allComponentsRaw?.find((item) => item._id === props.meta?.componentId);
   const containerRef = useRef(null);
-  const { tab, id, ...params } = useParams();
-  const createEventHandler = useCallback(
-    (key, processHandler, navigate, id, newParams) =>
-      debounce(
-        (e) =>
-          processController(
-            processHandler || [],
-            e || {},
-            id,
-            navigate,
-            newParams,
-            'eventHandler',
-            props.meta.i,
-            () => '',
-            tab
-          ),
-        10
-      ),
-    []
-  );
+  // const { tab, id } = props?.meta?.config;
+  const tab = props?.meta?.config?.id;
+  const id = props?.meta?.config?.id;
   const [err, setErr] = useState(null);
   const appState = useSelector((state) => state.appState);
   const navigate = useNavigate();
-  const generateState = async () => {
-    const pageState = {};
-    const newParams = {
-      ...params,
-    };
-    const processItems = async (items) => {
-      const overrides = props.meta?.configuration?._overrides_ || [];
-      await Promise.all(
-        overrides.map(async (key) => {
-          try {
-            await processController(
-              key,
-              {},
-              currentApplication._id,
-              navigate,
-              newParams,
-              'onMount',
-              props.meta?.i,
-              (process) => '',
-              tab
-            );
-          } catch (error) {
-            console.error('Error processing override:', {
-              key,
-              error,
-            });
-          }
-        })
-      );
-    };
-    await processItems([]);
-    return pageState;
-  };
-  useEffect(() => {
-    const fetchData = async () => {
-      await generateState();
-    };
-    if (props.meta?.i) {
-      fetchData();
-    }
-    () => {};
-  }, [tab, currentApplication?._id, props.checked, window.location.search]);
+
   const propsData = appState?.[tab]?.[props?.meta?.i] || {};
   const AntComponents = useMemo(
     () => ({
@@ -125,92 +64,76 @@ const MyComponent = (props) => {
       ),
     []
   );
+
+  // Add MUI components with Mui prefix
+  const MuiComponents = useMemo(
+    () => ({
+      ...Object.entries(MUI).reduce(
+        (acc, [key, value]) => ({
+          ...acc,
+          [`Mui${key}`]: value,
+        }),
+        {}
+      ),
+    }),
+    []
+  );
+
+  // Add MUI Icons with MuiIcon prefix
+  // const MuiIconComponents = useMemo(
+  //   () => ({
+  //     ...Object.entries(MuiIcons).reduce(
+  //       (acc, [key, value]) => ({
+  //         ...acc,
+  //         [`MuiIcon${key}`]: value,
+  //       }),
+  //       {}
+  //     ),
+  //   }),
+  //   []
+  // );
+
   const defaultData = useMemo(
     () => ({
       ...defaults(props?.data?.props?.schema || {}),
     }),
     [props?.data?.props?.schema]
   );
-  function generateHandlers(obj, navigate, id, newParams, targetKey = 'plugins') {
-    const handlers = {};
-    function traverse(obj, parentKey) {
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          const value = obj[key];
-          if (key === targetKey && Array.isArray(value)) {
-            if (parentKey) {
-              handlers[parentKey] = createEventHandler(parentKey, value, navigate, id, newParams);
-            }
-          } else if (typeof value === 'object' && value !== null) {
-            traverse(value, key);
-          }
-        }
-      }
-    }
-    traverse(obj, null);
-    return handlers;
-  }
+
   const eventHandlerProps = useMemo(() => {
     const han = {};
-    const newParams = {
-      ...params,
-    };
-    const it = Object.keys(props?.props || {})?.map((key) => {
+
+    Object.keys(props?.props || {})?.map((key) => {
       if (Array.isArray(props.props[key]?.plugins)) {
-        han[key] = createEventHandler(key, props.props[key], navigate, id, newParams);
+        han[key] = (e) => {
+          return props?.meta?.config?.createEventHandler(e, props.props[key], props?.meta?.meta?.i);
+        };
+
         return props.props[key]?.plugins;
       }
     });
     return han;
-  }, [params, props, id, navigate]);
-  function findById(obj, targetId) {
-    if (obj?.name === targetId) return obj;
-    if (Array.isArray(obj)) {
-      for (const item of obj) {
-        const result = findById(item, targetId);
-        if (result) return result;
-      }
-    } else if (typeof obj === 'object' && obj !== null) {
-      for (const key in obj) {
-        const result = findById(obj[key], targetId);
-        if (result) return result;
-      }
-    }
-    return null;
-  }
-  function updateByIdAndReturnNew(obj, targetId, newData) {
-    if (obj && obj.i === targetId) {
-      return {
-        ...obj,
-        ...newData,
-      };
-    }
-    if (Array.isArray(obj)) {
-      return obj.map((item) => updateByIdAndReturnNew(item, targetId, newData));
-    } else if (typeof obj === 'object' && obj !== null) {
-      const updatedObject = {};
-      for (const key in obj) {
-        updatedObject[key] = updateByIdAndReturnNew(obj[key], targetId, newData);
-      }
-      return updatedObject;
-    }
-    return obj;
-  }
-  const onLayoutChange = (layout) => {
-    const newItem = {
-      ...findById(props.currentLayout, props.meta.i),
-      layout,
-    };
-    props.onLayoutChange(updateByIdAndReturnNew(props.currentLayout, props.meta.i, newItem));
-  };
+  }, [props, id, navigate]);
+
   const bindings = useMemo(() => {
+    // Create a set of all the event handler property names for quick lookup
+    const eventHandlerPropNames = new Set(Object.keys(genericEventHandlers?.properties));
+
+    // Filter out event handlers from props.props if needed
+    const filteredProps = {};
+    for (const key in props.props) {
+      if (!eventHandlerPropNames.has(key)) {
+        filteredProps[key] = props.props[key];
+      }
+    }
+
     return {
       ...defaultData,
-      ...props.props,
+      ...filteredProps, // Using filtered props instead of props.props
       ...propsData,
-      ...eventHandlerProps,
+      ...eventHandlerProps, // You might want to handle this separately
       children: props.children,
-      onNestedLayoutChange: onLayoutChange,
+      // onNestedLayoutChange: onLayoutChange,
       currentLayout: props?.meta?.layout,
       _parentId_: props?.meta?.i,
       _setItemToEdit_: props.setItemToEdit,
@@ -226,12 +149,12 @@ const MyComponent = (props) => {
     };
   }, [
     defaultData,
-    props.editMode,
+    // props.editMode,
     props.props,
     props.children,
     JSON.stringify(propsData),
-    eventHandlerProps,
-    propsData,
+    // eventHandlerProps,
+    // propsData,
     eventHandlerProps,
   ]);
   useEffect(() => {
@@ -242,7 +165,7 @@ const MyComponent = (props) => {
   return (
     <div
       ref={containerRef}
-      className={`text-gray-400 border-red-500 zoomedd6 pointer-efvents-none d ${
+      className={`text-gray-400 border-red-500 zoomedd6 pointer-efvents-none w-full h-full d ${
         props.editMode ? 'pointedr-events-none' : ''
       }`}
     >
@@ -264,6 +187,8 @@ const MyComponent = (props) => {
               components={{
                 ...AntComponents,
                 ...AntDCharts,
+                ...MuiComponents,
+                // ...MuiIconComponents,
                 // Grid/Container,
                 AntSchemaForm: FormSc,
                 // AntIcon,
