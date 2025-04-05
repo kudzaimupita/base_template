@@ -58,7 +58,6 @@
     "json-schema-defaults": "^0.4.0",
     "lodash": "^4.17.21",
     "moment": "^2.30.1",
-    "mui": "^0.0.1",
     "prettier": "^2.8.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
