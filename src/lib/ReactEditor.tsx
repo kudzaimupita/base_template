@@ -4,7 +4,6 @@
 import * as AntCharts from '@ant-design/plots';
 import * as AntDesign from 'antd';
 import * as MUI from '@mui/material';
-import * as MuiIcons from '@mui/icons-material';
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
