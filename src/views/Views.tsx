@@ -4,7 +4,9 @@ import store, { setDestroyInfo, setSessionInfo } from '@/store';
 
 import ElementRenderer from '../lib/RenderElements';
 import appConfig from '../../appConfig.json';
+import { setAppStatePartial } from '@/store/slices/appState';
 import { storeInvocation } from '@/services/invocationService';
+import { useDispatch } from 'react-redux';
 
 // const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
 const ScaleContainer = ({
@@ -116,6 +118,8 @@ const Views = () => {
     // If no defaultPrivatePage is set, use first view
     return appConfig.views[0];
   };
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const defaultPage = getDefaultPage(appConfig);
   return (
@@ -133,18 +137,17 @@ const Views = () => {
                   designHeight={route?.configuration?.deviceScreen?.size?.height}
                   className="w-[auto] bg-white"
                 >
-                  {' '}
                   <ElementRenderer
-                    setAppStatePartial={() => ''}
+                    setAppStatePartial={setAppStatePartial}
                     parentStyle={route?.style || {}}
                     // propsData={propsData}
                     // propsData={propsData}
                     targets={[]}
-                    dispatch={() => ''}
+                    dispatch={dispatch}
                     elements={route?.layout}
                     readOnly={false}
                     tab={route?.id}
-                    // navigate={navigate}
+                    navigate={navigate}
                     appState={{}}
                     parentId={null}
                     editMode={false}

@@ -532,10 +532,10 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
     // Split the path into parts in case of nested properties
     const parts = cleanPath.split('.');
 
-    // Get the base object - if compId is missing, just use state.appState[pathname[4]]
-    let result = process?.compId ? state?.appState?.[pathname[4]]?.[process.compId] : state?.appState?.[pathname[4]];
+    // Get the base object - if compId is missing, just use state.appState[pathname[0]]
+    let result = process?.compId ? state?.appState?.[pathname[1]]?.[process.compId] : state?.appState?.[pathname[1]];
 
-    // console.log(state.appState[pathname[4]], process.compId, newValue, parts, result);
+    console.log(state?.appState[pathname[1]]?.[process.compId], cleanPath);
 
     // Handle multi-level property access by traversing the object
     if (result && parts.length) {
@@ -563,7 +563,7 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
         }
       }
     }
-
+    console.log(result);
     return result;
   }
   // console.lo

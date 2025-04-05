@@ -68,6 +68,8 @@ const renderElementUtil = (
         if (!setAppStatePartial) {
           return [];
         }
+
+        console.log(process.store);
         const childElements = prevElements.filter((el) => el.parent === originalId);
         return childElements
           .map((childd) => {
