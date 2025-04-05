@@ -3,6 +3,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import store, { setDestroyInfo, setSessionInfo } from '@/store';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { ConfigProvider } from 'antd';
 import ElementRenderer from '../lib/RenderElements';
 import appConfig from '../../appConfig.json';
 import components from '../../components.json';
@@ -126,94 +127,112 @@ const Views = () => {
   const appState = useSelector((state) => state.appState);
   return (
     <Suspense fallback={<div className="flex flex-auto flex-col h-[100vh]">{/* <ModernSpinner /> */}</div>}>
-      <Routes>
-        {appConfig.views?.map((route) => {
-          const propsData = appState?.[route?.id] || {};
-          // const routeParams = (route?.params?.length ?? 0) > 0 ? `/${route.params?.join('/') ?? ''}` : '';
-          return (
-            <Route
-              key={`${route.id}`}
-              path={`/${route.id}`}
-              element={
-                <ScaleContainer
-                  designWidth={route?.configuration?.deviceScreen?.size?.width}
-                  designHeight={route?.configuration?.deviceScreen?.size?.height}
-                  className="w-[auto] bg-white"
-                >
-                  <ElementRenderer
-                    params={params}
-                    allComponentsRaw={components || []}
-                    setAppStatePartial={setAppStatePartial}
-                    parentStyle={route?.style || {}}
-                    propsData={propsData}
-                    // propsData={propsData}
-                    targets={[]}
-                    dispatch={dispatch}
-                    elements={route?.layout}
-                    readOnly={false}
-                    tab={route?.id}
-                    navigate={navigate}
-                    appState={appState || {}}
-                    parentId={null}
-                    editMode={false}
-                    // setSelectedElements={setSelectedTargets}
-                    // isDragging={isDragging}
-                    currentApplication={appConfig}
-                    // builderCursorMode={builderCursorMode}
-                    store={store}
-                    // refreshAppAuth={refreshAppAuth}
-                    setDestroyInfo={setDestroyInfo}
-                    setSessionInfo={setSessionInfo}
-                    storeInvocation={storeInvocation}
-                  />
-                </ScaleContainer>
-              }
-            />
-          );
-        })}{' '}
-        <Route
-          path="/"
-          element={
-            <ScaleContainer
-              designWidth={defaultPage?.configuration?.deviceScreen?.size?.width}
-              designHeight={defaultPage?.configuration?.deviceScreen?.size?.height}
-              // style={parentStyle}
-            >
-              <ElementRenderer
-                params={params}
-                allComponentsRaw={components || []}
-                setAppStatePartial={setAppStatePartial}
-                // setAppStatePartial={setAppStatePartial}
-                // parentStyle={}
-                parentStyle={defaultPage?.style}
-                propsData={appState?.[defaultPage?.id]}
-                // propsData={propsData}
-                targets={[]}
-                // dispatch={useDispatch()}
-                elements={defaultPage?.layout}
-                readOnly={false}
-                tab={defaultPage?.id}
-                navigate={navigate}
-                // appState={{}}
-                appState={appState || {}}
-                parentId={null}
-                editMode={false}
-                // setSelectedElements={setSelectedTargets}
-                // isDragging={isDragging}
-                currentApplication={appConfig}
-                // builderCursorMode={builderCursorMode}
-                store={store}
-                dispatch={dispatch}
-                // refreshAppAuth={refreshAppAuth}
-                setDestroyInfo={setDestroyInfo}
-                setSessionInfo={setSessionInfo}
-                storeInvocation={storeInvocation}
+      <ConfigProvider
+        theme={{
+          components: {},
+          token: {
+            colorText: '#B4b1b1', // Primary text color
+            // colorBgContainer: 'transparent',
+            fontFamily: "'Inter', sans-serif",
+            // fontFamily: "'Roboto', sans-serif",
+            // fontFamily: "'Lato', sans-serif",
+
+            // colorTextSecondary: '#ffa39e', // Secondary text color
+            // colorTextTertiary: '#ffd6d6', // Tertiary text color
+            // colorTextDisabled: '#ffe7e7', // Disabled text color
+          },
+          algorithm: null,
+        }}
+      >
+        <Routes>
+          {appConfig.views?.map((route) => {
+            const propsData = appState?.[route?.id] || {};
+            // const routeParams = (route?.params?.length ?? 0) > 0 ? `/${route.params?.join('/') ?? ''}` : '';
+            return (
+              <Route
+                key={`${route.id}`}
+                path={`/${route.id}`}
+                element={
+                  <ScaleContainer
+                    designWidth={route?.configuration?.deviceScreen?.size?.width}
+                    designHeight={route?.configuration?.deviceScreen?.size?.height}
+                    className="w-[auto] bg-white"
+                  >
+                    <ElementRenderer
+                      params={params}
+                      allComponentsRaw={components || []}
+                      setAppStatePartial={setAppStatePartial}
+                      parentStyle={route?.style || {}}
+                      propsData={propsData}
+                      // propsData={propsData}
+                      targets={[]}
+                      dispatch={dispatch}
+                      elements={route?.layout}
+                      readOnly={false}
+                      tab={route?.id}
+                      navigate={navigate}
+                      appState={appState || {}}
+                      parentId={null}
+                      editMode={false}
+                      // setSelectedElements={setSelectedTargets}
+                      // isDragging={isDragging}
+                      currentApplication={appConfig}
+                      // builderCursorMode={builderCursorMode}
+                      store={store}
+                      // refreshAppAuth={refreshAppAuth}
+                      setDestroyInfo={setDestroyInfo}
+                      setSessionInfo={setSessionInfo}
+                      storeInvocation={storeInvocation}
+                    />
+                  </ScaleContainer>
+                }
               />
-              {/* {defaultPage?.name} */}
-            </ScaleContainer>
-          }
-        />
-      </Routes>
+            );
+          })}{' '}
+          <Route
+            path="/"
+            element={
+              <ScaleContainer
+                designWidth={defaultPage?.configuration?.deviceScreen?.size?.width}
+                designHeight={defaultPage?.configuration?.deviceScreen?.size?.height}
+                // style={parentStyle}
+              >
+                <ElementRenderer
+                  params={params}
+                  allComponentsRaw={components || []}
+                  setAppStatePartial={setAppStatePartial}
+                  // setAppStatePartial={setAppStatePartial}
+                  // parentStyle={}
+                  parentStyle={defaultPage?.style}
+                  propsData={appState?.[defaultPage?.id]}
+                  // propsData={propsData}
+                  targets={[]}
+                  // dispatch={useDispatch()}
+                  elements={defaultPage?.layout}
+                  readOnly={false}
+                  tab={defaultPage?.id}
+                  navigate={navigate}
+                  // appState={{}}
+                  appState={appState || {}}
+                  parentId={null}
+                  editMode={false}
+                  // setSelectedElements={setSelectedTargets}
+                  // isDragging={isDragging}
+                  currentApplication={appConfig}
+                  // builderCursorMode={builderCursorMode}
+                  store={store}
+                  dispatch={dispatch}
+                  // refreshAppAuth={refreshAppAuth}
+                  setDestroyInfo={setDestroyInfo}
+                  setSessionInfo={setSessionInfo}
+                  storeInvocation={storeInvocation}
+                />
+                {/* {defaultPage?.name} */}
+              </ScaleContainer>
+            }
+          />
+        </Routes>
+      </ConfigProvider>
     </Suspense>
   );
 };
