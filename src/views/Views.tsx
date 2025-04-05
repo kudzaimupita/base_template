@@ -1,12 +1,13 @@
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import store, { setDestroyInfo, setSessionInfo } from '@/store';
+import { useDispatch, useSelector } from 'react-redux';
 
 import ElementRenderer from '../lib/RenderElements';
 import appConfig from '../../appConfig.json';
+import components from '../../components.json';
 import { setAppStatePartial } from '@/store/slices/appState';
 import { storeInvocation } from '@/services/invocationService';
-import { useDispatch } from 'react-redux';
 
 // const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
 const ScaleContainer = ({
@@ -120,12 +121,14 @@ const Views = () => {
   };
   const navigate = useNavigate();
   const dispatch = useDispatch();
-
+  const params = useParams();
   const defaultPage = getDefaultPage(appConfig);
+  const appState = useSelector((state) => state.appState);
   return (
     <Suspense fallback={<div className="flex flex-auto flex-col h-[100vh]">{/* <ModernSpinner /> */}</div>}>
       <Routes>
         {appConfig.views?.map((route) => {
+          const propsData = appState?.[route?.id] || {};
           // const routeParams = (route?.params?.length ?? 0) > 0 ? `/${route.params?.join('/') ?? ''}` : '';
           return (
             <Route
@@ -138,9 +141,11 @@ const Views = () => {
                   className="w-[auto] bg-white"
                 >
                   <ElementRenderer
+                    params={params}
+                    allComponentsRaw={components || []}
                     setAppStatePartial={setAppStatePartial}
                     parentStyle={route?.style || {}}
-                    // propsData={propsData}
+                    propsData={propsData}
                     // propsData={propsData}
                     targets={[]}
                     dispatch={dispatch}
@@ -148,7 +153,7 @@ const Views = () => {
                     readOnly={false}
                     tab={route?.id}
                     navigate={navigate}
-                    appState={{}}
+                    appState={appState || {}}
                     parentId={null}
                     editMode={false}
                     // setSelectedElements={setSelectedTargets}
@@ -175,18 +180,22 @@ const Views = () => {
               // style={parentStyle}
             >
               <ElementRenderer
+                params={params}
+                allComponentsRaw={components || []}
+                setAppStatePartial={setAppStatePartial}
                 // setAppStatePartial={setAppStatePartial}
                 // parentStyle={}
                 parentStyle={defaultPage?.style}
-                // propsData={propsData}
+                propsData={appState?.[defaultPage?.id]}
                 // propsData={propsData}
                 targets={[]}
                 // dispatch={useDispatch()}
                 elements={defaultPage?.layout}
                 readOnly={false}
                 tab={defaultPage?.id}
-                // navigate={navigate}
-                appState={{}}
+                navigate={navigate}
+                // appState={{}}
+                appState={appState || {}}
                 parentId={null}
                 editMode={false}
                 // setSelectedElements={setSelectedTargets}
@@ -194,6 +203,7 @@ const Views = () => {
                 currentApplication={appConfig}
                 // builderCursorMode={builderCursorMode}
                 store={store}
+                dispatch={dispatch}
                 // refreshAppAuth={refreshAppAuth}
                 setDestroyInfo={setDestroyInfo}
                 setSessionInfo={setSessionInfo}
