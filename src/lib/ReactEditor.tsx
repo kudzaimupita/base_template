@@ -1,19 +1,22 @@
+/* eslint-disable no-prototype-builtins */
 // import './ReactEditor.css';
 
 import * as AntCharts from '@ant-design/plots';
 import * as AntDesign from 'antd';
 import * as MUI from '@mui/material';
+import * as MuiIcons from '@mui/icons-material';
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { ErrorBoundary } from 'react-error-boundary';
 import FormSc from '@rjsf/antd';
+import { IconRenderer } from './IconRenderer';
 import defaults from 'json-schema-defaults';
 import { genericEventHandlers } from './eventHandlers';
 import { useSelector } from 'react-redux';
 
-// import * as MuiIcons from '@mui/icons-material';
+// import { useMemo } from 'react';
 
 const JsxParser = React.lazy(() => import('react-jsx-parser'));
 const fallbackRender = ({ error }) => (
@@ -100,18 +103,89 @@ const MyComponent = (props) => {
     [props?.data?.props?.schema]
   );
 
+  function deepReplace(obj, visited = new Set()) {
+    // Prevent infinite recursion for circular references by checking if the object has been visited
+    if (obj && typeof obj === 'object') {
+      if (visited.has(obj)) {
+        return obj; // Return the original object if it's already been visited (circular reference)
+      }
+      visited.add(obj);
+
+      // Deep clone the object or array to avoid mutating the original object
+      const clone = Array.isArray(obj) ? [...obj] : { ...obj };
+
+      // If it's an array, recursively apply deepReplace to each item
+      if (Array.isArray(clone)) {
+        return clone.map((item) => deepReplace(item, visited)); // Avoid infinite recursion in arrays
+      }
+
+      // If it's an object, check for the specific properties and replace
+      if (clone.hasOwnProperty('name') && clone.hasOwnProperty('set') && clone.hasOwnProperty('setName')) {
+        return (
+          <IconRenderer
+            icon={
+              clone || {
+                name: 'FaHouse',
+                set: 'Fa6',
+                setName: 'Font Awesome 6',
+              }
+            }
+            // color={props?.configuration?.iconColor || 'red'}
+            // size={props?.configuration?.iconSize}
+          />
+        );
+      }
+
+      // Otherwise, recursively check all properties of the object
+      for (let key in clone) {
+        if (clone.hasOwnProperty(key)) {
+          // Recursively replace properties
+          clone[key] = deepReplace(clone[key], visited); // Recurse on the properties
+        }
+      }
+
+      return clone; // Return the modified or unmodified clone
+    }
+
+    return obj; // Return the original object if not modified
+  }
+
   const eventHandlerProps = useMemo(() => {
     const han = {};
 
-    Object.keys(props?.props || {})?.map((key) => {
-      if (Array.isArray(props.props[key]?.plugins)) {
+    Object.keys(props?.props || {})?.forEach((key) => {
+      console.log(props);
+      const item = props.props[key];
+
+      // Replace nested objects with the required properties
+      const modifiedItem = deepReplace(item);
+
+      // Check if the item has the properties we are looking for
+      const hasProperties =
+        modifiedItem?.hasOwnProperty('name') &&
+        modifiedItem?.hasOwnProperty('set') &&
+        modifiedItem?.hasOwnProperty('setName');
+
+      // Check for plugins array and recursively process them
+      if (Array.isArray(modifiedItem?.plugins)) {
+        // Recursively apply deepReplace to each plugin in the plugins array
+        modifiedItem.plugins = modifiedItem.plugins.map((plugin) => {
+          // If the plugin itself is an object with specific properties, replace it
+          return deepReplace(plugin);
+        });
+
+        // Create event handler as usual
         han[key] = (e) => {
-          return props?.meta?.config?.createEventHandler(e, props.props[key], props?.meta?.meta?.i);
+          return props?.meta?.config?.createEventHandler(e, modifiedItem, props?.meta?.meta?.i);
         };
 
-        return props.props[key]?.plugins;
+        return modifiedItem.plugins; // Return the modified plugins
       }
+
+      // Optionally store the modified item if needed
+      han[key] = modifiedItem;
     });
+
     return han;
   }, [props, id, navigate]);
 
