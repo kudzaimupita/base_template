@@ -120,21 +120,21 @@ const MyComponent = (props) => {
       }
 
       // If it's an object, check for the specific properties and replace
-      if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
-        return (
-          <IconRenderer
-            icon={
-              clone || {
-                name: 'FaHouse',
-                set: 'Fa6',
-                setName: 'Font Awesome 6',
-              }
-            }
-            // color={props?.configuration?.iconColor || 'red'}
-            // size={props?.configuration?.iconSize}
-          />
-        );
-      }
+      // if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
+      //   return (
+      //     <IconRenderer
+      //       icon={
+      //         clone || {
+      //           name: 'FaHouse',
+      //           set: 'Fa6',
+      //           setName: 'Font Awesome 6',
+      //         }
+      //       }
+      //       // color={props?.configuration?.iconColor || 'red'}
+      //       // size={props?.configuration?.iconSize}
+      //     />
+      //   );
+      // }
 
       // Otherwise, recursively check all properties of the object
       for (let key in clone) {
@@ -246,7 +246,8 @@ const MyComponent = (props) => {
       {err ? (
         <div className="text-red-500">{JSON.stringify(err)}</div>
       ) : (
-        <ErrorBoundary fallbackRender={fallbackRender}>
+        <ErrorBoundary onError={() => ''} fallbackRender={fallbackRender}>
+          {/* // <ErrorBoundary onError={} fallbackRender={fallbackRender}> */}
           <Suspense
             fallback={
               <div>
@@ -266,6 +267,7 @@ const MyComponent = (props) => {
                 // Grid/Container,
                 AntSchemaForm: FormSc,
                 // AntIcon,
+                IconRenderer,
               }}
               blacklistedAttrs={[]}
               bindings={bindings}
