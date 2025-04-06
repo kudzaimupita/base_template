@@ -103,6 +103,17 @@ const MyComponent = (props) => {
     [props?.data?.props?.schema]
   );
 
+  const SafeIconRenderer = React.memo(function SafeIconRenderer(props) {
+    const iconProps = props.iconProps || {};
+
+    // Only render if we have valid icon data
+    if (iconProps && iconProps.name && iconProps.set && iconProps.setName) {
+      return <IconRenderer icon={iconProps} />;
+    }
+    return null;
+  });
+
+  // Modified deepReplace function that serializes icon objects
   function deepReplace(obj, visited = new Set()) {
     // Base case: null, undefined, or primitive types
     if (obj === null || typeof obj !== 'object') {
@@ -120,15 +131,17 @@ const MyComponent = (props) => {
       return obj.map((item) => deepReplace(item, new Set(visited)));
     }
 
-    // Check if this is an icon object that needs to be replaced with IconRenderer
-    if (obj?.hasOwnProperty('name') && obj?.hasOwnProperty('set') && obj?.hasOwnProperty('setName')) {
-      // Return the React element directly, not the object
-      return React.createElement(IconRenderer, {
-        icon: obj,
-        // Include any other props you want to pass to IconRenderer
-        // color: props?.configuration?.iconColor || 'red',
-        // size: props?.configuration?.iconSize,
-      });
+    // Special handling for icon objects
+    if (
+      obj &&
+      typeof obj === 'object' &&
+      obj.hasOwnProperty('name') &&
+      obj.hasOwnProperty('set') &&
+      obj.hasOwnProperty('setName')
+    ) {
+      // Instead of trying to return a component, return a special marker string
+      // that we can replace later with the actual component
+      return `__ICON_MARKER__${JSON.stringify(obj)}__END_ICON__`;
     }
 
     // For other objects, clone and process each property
@@ -140,6 +153,24 @@ const MyComponent = (props) => {
     }
 
     return clone;
+  }
+
+  // Function to process JSX content and replace icon markers with actual components
+  function processJsxContent(jsxContent) {
+    if (!jsxContent || typeof jsxContent !== 'string') {
+      return jsxContent;
+    }
+
+    // Replace icon markers with SafeIconRenderer components
+    return jsxContent.replace(/__ICON_MARKER__(.+?)__END_ICON__/g, (match, iconJSON) => {
+      try {
+        const iconData = JSON.parse(iconJSON);
+        return `<SafeIconRenderer iconProps={${JSON.stringify(iconData)}} />`;
+      } catch (error) {
+        console.error('Failed to parse icon data:', error);
+        return '';
+      }
+    });
   }
 
   const eventHandlerProps = useMemo(() => {
@@ -180,7 +211,21 @@ const MyComponent = (props) => {
 
     return han;
   }, [props, id, navigate]);
+  const processedJsx = useMemo(() => {
+    return processJsxContent(props.jsx);
+  }, [props.jsx]);
 
+  // Add SafeIconRenderer to your components list
+  const allComponents = useMemo(
+    () => ({
+      ...AntComponents,
+      ...AntDCharts,
+      ...MuiComponents,
+      SafeIconRenderer,
+      AntSchemaForm: FormSc,
+    }),
+    [AntComponents, AntDCharts, MuiComponents]
+  );
   const bindings = useMemo(() => {
     // Create a set of all the event handler property names for quick lookup
     const eventHandlerPropNames = new Set(Object.keys(genericEventHandlers?.properties));
@@ -250,15 +295,7 @@ const MyComponent = (props) => {
               className={'w-full  ' + component?.isContainer && ' h-full'}
               renderError={setErr}
               jsx={props.jsx}
-              components={{
-                ...AntComponents,
-                ...AntDCharts,
-                ...MuiComponents,
-                // ...MuiIconComponents,
-                // Grid/Container,
-                AntSchemaForm: FormSc,
-                // AntIcon,
-              }}
+              components={allComponents}
               blacklistedAttrs={[]}
               bindings={bindings}
             />
