@@ -121,19 +121,18 @@ const MyComponent = (props) => {
 
       // If it's an object, check for the specific properties and replace
       if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
-        return (
-          <IconRenderer
-            icon={
-              clone || {
-                name: 'FaHouse',
-                set: 'Fa6',
-                setName: 'Font Awesome 6',
-              }
+        return <>test</>;
+        <IconRenderer
+          icon={
+            clone || {
+              name: 'FaHouse',
+              set: 'Fa6',
+              setName: 'Font Awesome 6',
             }
-            // color={props?.configuration?.iconColor || 'red'}
-            // size={props?.configuration?.iconSize}
-          />
-        );
+          }
+          // color={props?.configuration?.iconColor || 'red'}
+          // size={props?.configuration?.iconSize}
+        />;
       }
 
       // Otherwise, recursively check all properties of the object
