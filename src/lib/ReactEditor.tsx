@@ -104,49 +104,42 @@ const MyComponent = (props) => {
   );
 
   function deepReplace(obj, visited = new Set()) {
-    // Prevent infinite recursion for circular references by checking if the object has been visited
-    if (obj && typeof obj === 'object') {
-      if (visited.has(obj)) {
-        return obj; // Return the original object if it's already been visited (circular reference)
-      }
-      visited.add(obj);
-
-      // Deep clone the object or array to avoid mutating the original object
-      const clone = Array.isArray(obj) ? [...obj] : { ...obj };
-
-      // If it's an array, recursively apply deepReplace to each item
-      if (Array.isArray(clone)) {
-        return clone.map((item) => deepReplace(item, visited)); // Avoid infinite recursion in arrays
-      }
-
-      // If it's an object, check for the specific properties and replace
-      if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
-        return <>test</>;
-        <IconRenderer
-          icon={
-            clone || {
-              name: 'FaHouse',
-              set: 'Fa6',
-              setName: 'Font Awesome 6',
-            }
-          }
-          // color={props?.configuration?.iconColor || 'red'}
-          // size={props?.configuration?.iconSize}
-        />;
-      }
-
-      // Otherwise, recursively check all properties of the object
-      for (let key in clone) {
-        if (clone.hasOwnProperty(key)) {
-          // Recursively replace properties
-          clone[key] = deepReplace(clone[key], visited); // Recurse on the properties
-        }
-      }
-
-      return clone; // Return the modified or unmodified clone
+    // Base case: null, undefined, or primitive types
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
     }
 
-    return obj; // Return the original object if not modified
+    // Prevent infinite recursion for circular references
+    if (visited.has(obj)) {
+      return obj;
+    }
+    visited.add(obj);
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      return obj.map((item) => deepReplace(item, new Set(visited)));
+    }
+
+    // Check if this is an icon object that needs to be replaced with IconRenderer
+    if (obj?.hasOwnProperty('name') && obj?.hasOwnProperty('set') && obj?.hasOwnProperty('setName')) {
+      // Return the React element directly, not the object
+      return React.createElement(IconRenderer, {
+        icon: obj,
+        // Include any other props you want to pass to IconRenderer
+        // color: props?.configuration?.iconColor || 'red',
+        // size: props?.configuration?.iconSize,
+      });
+    }
+
+    // For other objects, clone and process each property
+    const clone = { ...obj };
+    for (let key in clone) {
+      if (clone.hasOwnProperty(key)) {
+        clone[key] = deepReplace(clone[key], new Set(visited));
+      }
+    }
+
+    return clone;
   }
 
   const eventHandlerProps = useMemo(() => {
