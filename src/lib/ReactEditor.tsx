@@ -103,74 +103,51 @@ const MyComponent = (props) => {
     [props?.data?.props?.schema]
   );
 
-  const SafeIconRenderer = React.memo(function SafeIconRenderer(props) {
-    const iconProps = props.iconProps || {};
-
-    // Only render if we have valid icon data
-    if (iconProps && iconProps.name && iconProps.set && iconProps.setName) {
-      return <IconRenderer icon={iconProps} />;
-    }
-    return null;
-  });
-
-  // Modified deepReplace function that serializes icon objects
   function deepReplace(obj, visited = new Set()) {
-    // Base case: null, undefined, or primitive types
-    if (obj === null || typeof obj !== 'object') {
-      return obj;
-    }
-
-    // Prevent infinite recursion for circular references
-    if (visited.has(obj)) {
-      return obj;
-    }
-    visited.add(obj);
-
-    // Handle arrays
-    if (Array.isArray(obj)) {
-      return obj.map((item) => deepReplace(item, new Set(visited)));
-    }
-
-    // Special handling for icon objects
-    if (
-      obj &&
-      typeof obj === 'object' &&
-      obj.hasOwnProperty('name') &&
-      obj.hasOwnProperty('set') &&
-      obj.hasOwnProperty('setName')
-    ) {
-      // Instead of trying to return a component, return a special marker string
-      // that we can replace later with the actual component
-      return `__ICON_MARKER__${JSON.stringify(obj)}__END_ICON__`;
-    }
-
-    // For other objects, clone and process each property
-    const clone = { ...obj };
-    for (let key in clone) {
-      if (clone.hasOwnProperty(key)) {
-        clone[key] = deepReplace(clone[key], new Set(visited));
+    // Prevent infinite recursion for circular references by checking if the object has been visited
+    if (obj && typeof obj === 'object') {
+      if (visited.has(obj)) {
+        return obj; // Return the original object if it's already been visited (circular reference)
       }
-    }
+      visited.add(obj);
 
-    return clone;
-  }
+      // Deep clone the object or array to avoid mutating the original object
+      const clone = Array.isArray(obj) ? [...obj] : { ...obj };
 
-  // Function to process JSX content and replace icon markers with actual components
-  function processJsxContent(jsxContent) {
-    if (!jsxContent || typeof jsxContent !== 'string') {
-      return jsxContent;
-    }
-
-    // Replace icon markers with SafeIconRenderer components
-    return jsxContent.replace(/__ICON_MARKER__(.+?)__END_ICON__/g, (match, iconJSON) => {
-      try {
-        const iconData = JSON.parse(iconJSON);
-        return `<SafeIconRenderer iconProps={${JSON.stringify(iconData)}} />`;
-      } catch (error) {
-        console.error('Failed to parse icon data:', error);
-        return '';
+      // If it's an array, recursively apply deepReplace to each item
+      if (Array.isArray(clone)) {
+        return clone.map((item) => deepReplace(item, visited)); // Avoid infinite recursion in arrays
       }
-    });
+
+      // If it's an object, check for the specific properties and replace
+      if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
+        return (
+          <IconRenderer
+            icon={
+              clone || {
+                name: 'FaHouse',
+                set: 'Fa6',
+                setName: 'Font Awesome 6',
+              }
+            }
+            // color={props?.configuration?.iconColor || 'red'}
+            // size={props?.configuration?.iconSize}
+          />
+        );
+      }
+
+      // Otherwise, recursively check all properties of the object
+      for (let key in clone) {
+        if (clone.hasOwnProperty(key)) {
+          // Recursively replace properties
+          clone[key] = deepReplace(clone[key], visited); // Recurse on the properties
+        }
+      }
+
+      return clone; // Return the modified or unmodified clone
+    }
+
+    return obj; // Return the original object if not modified
   }
 
   const eventHandlerProps = useMemo(() => {
@@ -211,21 +188,7 @@ const MyComponent = (props) => {
 
     return han;
   }, [props, id, navigate]);
-  const processedJsx = useMemo(() => {
-    return processJsxContent(props.jsx);
-  }, [props.jsx]);
 
-  // Add SafeIconRenderer to your components list
-  const allComponents = useMemo(
-    () => ({
-      ...AntComponents,
-      ...AntDCharts,
-      ...MuiComponents,
-      SafeIconRenderer,
-      AntSchemaForm: FormSc,
-    }),
-    [AntComponents, AntDCharts, MuiComponents]
-  );
   const bindings = useMemo(() => {
     // Create a set of all the event handler property names for quick lookup
     const eventHandlerPropNames = new Set(Object.keys(genericEventHandlers?.properties));
@@ -280,7 +243,7 @@ const MyComponent = (props) => {
         props.editMode ? 'pointedr-events-none' : ''
       }`}
     >
-      {false ? (
+      {err ? (
         <div className="text-red-500">{JSON.stringify(err)}</div>
       ) : (
         <ErrorBoundary fallbackRender={fallbackRender}>
@@ -295,7 +258,15 @@ const MyComponent = (props) => {
               className={'w-full  ' + component?.isContainer && ' h-full'}
               renderError={setErr}
               jsx={props.jsx}
-              components={allComponents}
+              components={{
+                ...AntComponents,
+                ...AntDCharts,
+                ...MuiComponents,
+                // ...MuiIconComponents,
+                // Grid/Container,
+                AntSchemaForm: FormSc,
+                // AntIcon,
+              }}
               blacklistedAttrs={[]}
               bindings={bindings}
             />
