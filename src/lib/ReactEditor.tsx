@@ -4,6 +4,7 @@
 import * as AntCharts from '@ant-design/plots';
 import * as AntDesign from 'antd';
 import * as MUI from '@mui/material';
+import * as MuiIcons from '@mui/icons-material';
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -119,7 +120,7 @@ const MyComponent = (props) => {
       }
 
       // If it's an object, check for the specific properties and replace
-      if (clone.hasOwnProperty('name') && clone.hasOwnProperty('set') && clone.hasOwnProperty('setName')) {
+      if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
         return (
           <IconRenderer
             icon={
@@ -242,7 +243,7 @@ const MyComponent = (props) => {
         props.editMode ? 'pointedr-events-none' : ''
       }`}
     >
-      {err ? (
+      {false ? (
         <div className="text-red-500">{JSON.stringify(err)}</div>
       ) : (
         <ErrorBoundary fallbackRender={fallbackRender}>
