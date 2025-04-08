@@ -120,21 +120,21 @@ const MyComponent = (props) => {
       }
 
       // If it's an object, check for the specific properties and replace
-      // if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
-      //   return (
-      //     <IconRenderer
-      //       icon={
-      //         clone || {
-      //           name: 'FaHouse',
-      //           set: 'Fa6',
-      //           setName: 'Font Awesome 6',
-      //         }
-      //       }
-      //       // color={props?.configuration?.iconColor || 'red'}
-      //       // size={props?.configuration?.iconSize}
-      //     />
-      //   );
-      // }
+      if (clone?.hasOwnProperty('name') && clone?.hasOwnProperty('set') && clone?.hasOwnProperty('setName')) {
+        return (
+          <IconRenderer
+            icon={
+              clone || {
+                name: 'FaHouse',
+                set: 'Fa6',
+                setName: 'Font Awesome 6',
+              }
+            }
+            // color={props?.configuration?.iconColor || 'red'}
+            // size={props?.configuration?.iconSize}
+          />
+        );
+      }
 
       // Otherwise, recursively check all properties of the object
       for (let key in clone) {
@@ -175,8 +175,18 @@ const MyComponent = (props) => {
         });
 
         // Create event handler as usual
-        han[key] = (e) => {
-          return props?.meta?.config?.createEventHandler(e, modifiedItem, props?.meta?.meta?.i);
+        han[key] = (...args) => {
+          // Create an event object that combines all parameters
+          const eventData = {
+            // Dynamically create properties for each argument
+            ...args.reduce((acc, arg, index) => {
+              // Use generic property names like arg0, arg1, etc.
+              acc[`arg${index}`] = arg;
+              return acc;
+            }, {}),
+          };
+          // Pass the bundled event data to your handler
+          return props?.meta?.config?.createEventHandler(eventData, modifiedItem, props?.meta?.meta?.i);
         };
 
         return modifiedItem.plugins; // Return the modified plugins
@@ -246,8 +256,7 @@ const MyComponent = (props) => {
       {err ? (
         <div className="text-red-500">{JSON.stringify(err)}</div>
       ) : (
-        <ErrorBoundary onError={() => ''} fallbackRender={fallbackRender}>
-          {/* // <ErrorBoundary onError={} fallbackRender={fallbackRender}> */}
+        <ErrorBoundary fallbackRender={fallbackRender}>
           <Suspense
             fallback={
               <div>
@@ -267,7 +276,6 @@ const MyComponent = (props) => {
                 // Grid/Container,
                 AntSchemaForm: FormSc,
                 // AntIcon,
-                IconRenderer,
               }}
               blacklistedAttrs={[]}
               bindings={bindings}

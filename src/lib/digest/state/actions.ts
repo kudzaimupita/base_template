@@ -2187,7 +2187,13 @@ export const statePlugin = {
               currentParams.set(encodeURIComponent(key), encodeURIComponent(value));
             });
           }
-          const baseUrl = `/applications/${appId}/views/${process?.pageToNavigate}`;
+          let baseUrl = '';
+          if (import.meta.env.VITE_CLIENT_API_URL) {
+            baseUrl = `/${process?.pageToNavigate}`;
+          } else {
+            baseUrl = `/applications/${appId}/views/${process?.pageToNavigate}`;
+          }
+          // const baseUrl = ;
           const fullPath = newPath ? `${baseUrl}/${newPath}` : baseUrl;
           const fullUrl = `${fullPath}${currentParams.toString() ? `?${currentParams.toString()}` : ''}`;
           if (process.isExternalPath) {
