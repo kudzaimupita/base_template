@@ -2188,7 +2188,7 @@ export const statePlugin = {
             });
           }
           let baseUrl = '';
-          if (import.meta.env.VITE_CLIENT_API_URL) {
+          if (import.meta.env.VITE_ISDEPLOYED) {
             baseUrl = `/${process?.pageToNavigate}`;
           } else {
             baseUrl = `/applications/${appId}/views/${process?.pageToNavigate}`;
