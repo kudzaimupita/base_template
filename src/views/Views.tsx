@@ -5,12 +5,23 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { ConfigProvider } from 'antd';
 import ElementRenderer from '../lib/RenderElements';
-import appConfig from '../../appConfig.json';
-import components from '../../components.json';
 import { setAppStatePartial } from '@/store/slices/appState';
 import { storeInvocation } from '@/services/invocationService';
 
-// const appConfig = JSON.parse(import.meta.env.VITE_APP_CONFIG || '{}');
+// Fetch JSON function (direct fetch from S3)
+const fetchJSON = async (url) => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load JSON from ${url}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching JSON:', error);
+    return null;
+  }
+};
+
 const ScaleContainer = ({
   designWidth = 1440,
   designHeight = 900,
@@ -20,32 +31,20 @@ const ScaleContainer = ({
   style,
   minScale = 0.3,
 }) => {
-  // Use useCallback for the scale calculation function
   const calculateDimensions = useCallback(() => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-
-    // Always use the width scale as the primary scale factor
-    // This ensures width always fills the screen
     let newScale = viewportWidth / designWidth;
-
-    // Apply min/max constraints
     newScale = Math.min(Math.max(newScale, minScale), maxScale);
-
     const scaledWidth = designWidth * newScale;
     const scaledHeight = designHeight * newScale;
-
-    // Center vertically
-    const x = 0; // No horizontal centering since we want to fill width
+    const x = 0;
     const y = Math.max(0, (viewportHeight - scaledHeight) / 2);
-
     return { scale: newScale, position: { x, y } };
   }, [designWidth, designHeight, maxScale, minScale]);
 
-  // Use useMemo for the initial calculation
   const initialDimensions = useMemo(() => calculateDimensions(), [calculateDimensions]);
 
-  // Move state initialization to use memoized values
   const [scale, setScale] = useState(initialDimensions.scale);
   const [position, setPosition] = useState(initialDimensions.position);
 
@@ -55,16 +54,11 @@ const ScaleContainer = ({
       setScale(newDimensions.scale);
       setPosition(newDimensions.position);
     };
-
-    // Initial calculation to ensure correct starting position
     updateDimensions();
-
-    // Add resize listener for future changes
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, [calculateDimensions]);
 
-  // Memoize the style object to prevent unnecessary recalculations
   const containerStyle = useMemo(
     () => ({
       ...style,
@@ -86,68 +80,61 @@ const ScaleContainer = ({
 };
 
 const Views = () => {
-  // const navigate = useNavigate();
-  useEffect(() => {
-    // Set document title from config
-    if (appConfig?.title || appConfig.name) {
-      document.title = appConfig?.title || appConfig.name;
-    }
+  const [appConfig, setAppConfig] = useState(null);
+  const [components, setComponents] = useState(null);
 
-    // Set favicon from base64 config
-    if (appConfig.icon) {
-      const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
-      link.type = 'image/png';
-      link.rel = 'icon';
-      link.href = appConfig?.icon || '';
-      document.getElementsByTagName('head')[0].appendChild(link);
-    }
+  useEffect(() => {
+    // Fetch appConfig and components from S3 URLs
+    const loadData = async () => {
+      const config = await fetchJSON(`https://servly-app-${import.meta.env.VITE_APP_ID}.s3.us-east-1.amazonaws.com/appConfig.json`);
+      const comps = await fetchJSON(`https://servly-app-${import.meta.env.VITE_APP_ID}.s3.us-east-1.amazonaws.com/components.json`);
+      
+
+      if (config) setAppConfig(config);
+      if (comps) setComponents(comps);
+    };
+
+    loadData();
   }, []);
+
+  if (!appConfig || !components) {
+    return <div>Loading...</div>;
+  }
+
   const getDefaultPage = (appConfig) => {
-    // Guard clause for missing appConfig
     if (!appConfig?.views?.length) {
       return {};
     }
 
     const defaultPageId = appConfig?.layoutSettings?.defaultPrivatePage;
-
-    // If defaultPrivatePage is set, try to find that view
     if (defaultPageId) {
       const specifiedPage = appConfig.views.find((view) => view.id === defaultPageId);
-      // Return found page or fallback to first view
       return specifiedPage || appConfig.views[0];
     }
 
-    // If no defaultPrivatePage is set, use first view
     return appConfig.views[0];
   };
+
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const params = useParams();
   const defaultPage = getDefaultPage(appConfig);
   const appState = useSelector((state) => state.appState);
+
   return (
-    <Suspense fallback={<div className="flex flex-auto flex-col h-[100vh]">{/* <ModernSpinner /> */}</div>}>
+    <Suspense fallback={<div className="flex flex-auto flex-col h-[100vh]"></div>}>
       <ConfigProvider
         theme={{
           components: {},
           token: {
             colorText: '#B4b1b1', // Primary text color
-            // colorBgContainer: 'transparent',
             fontFamily: "'Inter', sans-serif",
-            // fontFamily: "'Roboto', sans-serif",
-            // fontFamily: "'Lato', sans-serif",
-
-            // colorTextSecondary: '#ffa39e', // Secondary text color
-            // colorTextTertiary: '#ffd6d6', // Tertiary text color
-            // colorTextDisabled: '#ffe7e7', // Disabled text color
           },
-          algorithm: null,
         }}
       >
         <Routes>
           {appConfig.views?.map((route) => {
             const propsData = appState?.[route?.id] || {};
-            // const routeParams = (route?.params?.length ?? 0) > 0 ? `/${route.params?.join('/') ?? ''}` : '';
             return (
               <Route
                 key={`${route.id}`}
@@ -164,7 +151,6 @@ const Views = () => {
                       setAppStatePartial={setAppStatePartial}
                       parentStyle={route?.style || {}}
                       propsData={propsData}
-                      // propsData={propsData}
                       targets={[]}
                       dispatch={dispatch}
                       elements={route?.layout}
@@ -174,12 +160,7 @@ const Views = () => {
                       appState={appState || {}}
                       parentId={null}
                       editMode={false}
-                      // setSelectedElements={setSelectedTargets}
-                      // isDragging={isDragging}
-                      currentApplication={appConfig}
-                      // builderCursorMode={builderCursorMode}
                       store={store}
-                      // refreshAppAuth={refreshAppAuth}
                       setDestroyInfo={setDestroyInfo}
                       setSessionInfo={setSessionInfo}
                       storeInvocation={storeInvocation}
@@ -188,46 +169,34 @@ const Views = () => {
                 }
               />
             );
-          })}{' '}
+          })}
           <Route
             path="/"
             element={
               <ScaleContainer
                 designWidth={defaultPage?.configuration?.deviceScreen?.size?.width}
                 designHeight={defaultPage?.configuration?.deviceScreen?.size?.height}
-                // style={parentStyle}
               >
                 <ElementRenderer
                   params={params}
                   allComponentsRaw={components || []}
                   setAppStatePartial={setAppStatePartial}
-                  // setAppStatePartial={setAppStatePartial}
-                  // parentStyle={}
                   parentStyle={defaultPage?.style}
                   propsData={appState?.[defaultPage?.id]}
-                  // propsData={propsData}
                   targets={[]}
-                  // dispatch={useDispatch()}
                   elements={defaultPage?.layout}
                   readOnly={false}
                   tab={defaultPage?.id}
                   navigate={navigate}
-                  // appState={{}}
                   appState={appState || {}}
                   parentId={null}
                   editMode={false}
-                  // setSelectedElements={setSelectedTargets}
-                  // isDragging={isDragging}
-                  currentApplication={appConfig}
-                  // builderCursorMode={builderCursorMode}
                   store={store}
                   dispatch={dispatch}
-                  // refreshAppAuth={refreshAppAuth}
                   setDestroyInfo={setDestroyInfo}
                   setSessionInfo={setSessionInfo}
                   storeInvocation={storeInvocation}
                 />
-                {/* {defaultPage?.name} */}
               </ScaleContainer>
             }
           />
@@ -236,4 +205,5 @@ const Views = () => {
     </Suspense>
   );
 };
+
 export default Views;
