@@ -153,10 +153,7 @@ const Views = () => {
                 key={`${route.id}`}
                 path={`/${route.id}`}
                 element={
-                  <ScaleContainer
-                    designWidth={route?.configuration?.deviceScreen?.size?.width}
-                    designHeight={route?.configuration?.deviceScreen?.size?.height}
-                    className="w-[auto] bg-white"
+                  <
                   >
                     <ElementRenderer
                       params={params}
@@ -184,7 +181,7 @@ const Views = () => {
                       setSessionInfo={setSessionInfo}
                       storeInvocation={storeInvocation}
                     />
-                  </ScaleContainer>
+                  </>
                 }
               />
             );
@@ -192,10 +189,7 @@ const Views = () => {
           <Route
             path="/"
             element={
-              <ScaleContainer
-                designWidth={defaultPage?.configuration?.deviceScreen?.size?.width}
-                designHeight={defaultPage?.configuration?.deviceScreen?.size?.height}
-                // style={parentStyle}
+              <
               >
                 <ElementRenderer
                   params={params}
@@ -228,7 +222,7 @@ const Views = () => {
                   storeInvocation={storeInvocation}
                 />
                 {/* {defaultPage?.name} */}
-              </ScaleContainer>
+              </>
             }
           />
         </Routes>
