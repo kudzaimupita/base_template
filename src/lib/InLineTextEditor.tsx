@@ -2,6 +2,7 @@ import { CSSProperties, useEffect, useRef, useState } from 'react';
 
 interface IInlineEditText {
   initialText: string | null;
+  textType?: 'number' | 'text';
   lineType?: 'inline' | 'multiple';
   overflowEffect?: 'elipsis' | 'hide' | '';
   underLineOnHover?: boolean;
@@ -15,7 +16,8 @@ interface IInlineEditText {
 
 const InlineEditText: React.FC<IInlineEditText> = ({
   initialText = 'Type text',
-  fontFamily = 'Inter',
+  textType = 'text',
+  fontFamily = 'Poppins',
   className = '',
   overRideStyles,
   lineType = 'multiple',
@@ -118,7 +120,7 @@ const InlineEditText: React.FC<IInlineEditText> = ({
     return fontMap[fontFamily] || '';
   };
 
-  const baseStyles = `${getFontClass()} text-lg ${className}`;
+  const baseStyles = `${getFontClass()}  ${className}`;
   const customStyles = !getFontClass() ? { fontFamily } : {};
 
   const removeDefaultStyle: CSSProperties = {
@@ -131,22 +133,21 @@ const InlineEditText: React.FC<IInlineEditText> = ({
 
   const cursorStyles = isEditing
     ? {
-        caretColor: '#000',
-        caretShape: 'block',
-        animation: 'blink 1s step-end infinite',
-        boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.2)',
-        backgroundColor: 'rgba(59, 130, 246, 0.05)',
-        borderRadius: '2px',
-        padding: '2px',
-      }
+      caretColor: '#000',
+      caretShape: 'block',
+      animation: 'blink 1s step-end infinite',
+      boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.2)',
+      backgroundColor: 'rgba(59, 130, 246, 0.05)',
+      borderRadius: '2px',
+      padding: '2px',
+    }
     : {};
 
   const sharedProps = {
     ref: inputRef,
     value: text,
-    className: `${baseStyles} ${
-      overflowEffect === 'elipsis' ? 'overflow-hidden overflow-x-hidden whitespace-nowrap text-ellipsis' : ''
-    }`,
+    className: `${baseStyles} ${overflowEffect === 'elipsis' ? 'overflow-hidden overflow-x-hidden whitespace-nowrap text-ellipsis' : ''
+      }`,
     style: {
       textDecoration: underLineOnHover && isHover ? 'underline' : '',
       ...removeDefaultStyle,
@@ -168,9 +169,9 @@ const InlineEditText: React.FC<IInlineEditText> = ({
     return (
       <p
         {...sharedProps}
-        className={`cursor-default text-neutral-400 ${baseStyles}`}
+        className={`  ${baseStyles}`}
         style={{
-          fontSize: '14px',
+          // fontSize: '14px',
           textDecoration: underLineOnHover && isHover ? 'underline' : '',
           ...customStyles,
           ...overRideStyles,

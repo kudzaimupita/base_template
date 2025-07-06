@@ -260,7 +260,7 @@ function deepParse(input, req = {}, controllers = {}, sessionInfo) {
       }
       return jsonObject;
     }
-  } catch (error) {}
+  } catch (error) { }
   if (input === 'true' || input === 'false') {
     return input === 'true';
   }
@@ -273,7 +273,7 @@ function deepParse(input, req = {}, controllers = {}, sessionInfo) {
       if (Array.isArray(array)) {
         return array.map((item) => deepParse(item), controllers);
       }
-    } catch (error) {}
+    } catch (error) { }
   }
   return input;
 }
@@ -322,137 +322,342 @@ function secureInterpolate(template, sources) {
       parse: (value) => JSON.parse(value),
     },
     lodash: {
-      capitalize: _.capitalize,
-      // ... (other lodash functions)
+      // Core methods (assuming lodash is available)
+      capitalize: (str) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase(),
+      cloneDeep: (obj) => JSON.parse(JSON.stringify(obj)),
+      flatten: (arr) => arr.flat(),
+      flattenDeep: (arr) => arr.flat(Infinity),
+      uniq: (arr) => [...new Set(arr)],
+      merge: (target, ...sources) => Object.assign({}, target, ...sources),
+      sortBy: (arr, iteratee) => arr.sort((a, b) => {
+        const aVal = typeof iteratee === 'function' ? iteratee(a) : a[iteratee];
+        const bVal = typeof iteratee === 'function' ? iteratee(b) : b[iteratee];
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      }),
+      get: (obj, path, defaultValue) => {
+        const keys = path.split('.');
+        let result = obj;
+        for (const key of keys) {
+          if (result == null) return defaultValue;
+          result = result[key];
+        }
+        return result !== undefined ? result : defaultValue;
+      },
+      isEmpty: (value) => {
+        if (value == null) return true;
+        if (Array.isArray(value) || typeof value === 'string') return value.length === 0;
+        if (typeof value === 'object') return Object.keys(value).length === 0;
+        return false;
+      },
+      isArray: Array.isArray,
+      isObject: (value) => value !== null && typeof value === 'object' && !Array.isArray(value),
+      isEqual: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+      isNil: (value) => value == null,
+      isNumber: (value) => typeof value === 'number' && !isNaN(value),
+      isString: (value) => typeof value === 'string',
+      isBoolean: (value) => typeof value === 'boolean',
+      isDate: (value) => value instanceof Date,
+      isFunction: (value) => typeof value === 'function',
     },
-    ...sources,
+    ...sources, // Merge with any additional sources provided
   };
 
-  // Helper function to safely get nested properties
-  function safeGet(obj, path) {
-    if (!obj) return undefined;
+  function getValue(path, context = predefinedSources) {
+    if (path === 'null') return null;
+    if (path === 'undefined') return undefined;
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (!isNaN(path) && path !== '') return Number(path);
+    if (path.startsWith('"') && path.endsWith('"')) return path.slice(1, -1);
+    if (path.startsWith("'") && path.endsWith("'")) return path.slice(1, -1);
+
     const parts = path.split('.');
-    let current = obj;
+    let value = context;
 
     for (const part of parts) {
-      if (current === null || current === undefined || typeof current !== 'object') {
+      if (value && typeof value === 'object' && part in value) {
+        value = value[part];
+      } else {
         return undefined;
       }
-      current = current[part];
     }
 
-    return current;
+    return typeof value === 'function' ? value() : value;
+  }
+
+  function evaluateComparison(left, operator, right, context = predefinedSources) {
+    const leftVal = getValue(left.trim(), context);
+    const rightVal = getValue(right.trim(), context);
+
+    switch (operator) {
+      case '===': return leftVal === rightVal;
+      case '!==': return leftVal !== rightVal;
+      case '==': return leftVal == rightVal;
+      case '!=': return leftVal != rightVal;
+      case '>': return leftVal > rightVal;
+      case '<': return leftVal < rightVal;
+      case '>=': return leftVal >= rightVal;
+      case '<=': return leftVal <= rightVal;
+      default: return false;
+    }
+  }
+
+  function evaluateLogical(expression, context = predefinedSources) {
+    // Handle logical operators (&&, ||)
+    if (expression.includes('&&')) {
+      const parts = expression.split('&&').map(p => p.trim());
+      return parts.every(part => evaluateExpression(part, context));
+    }
+
+    if (expression.includes('||')) {
+      const parts = expression.split('||').map(p => p.trim());
+      return parts.some(part => evaluateExpression(part, context));
+    }
+
+    return evaluateExpression(expression, context);
+  }
+
+  function evaluateExpression(expression, context = predefinedSources) {
+    expression = expression.trim();
+
+    // Handle negation
+    if (expression.startsWith('!')) {
+      const innerExpression = expression.slice(1).trim();
+      return !evaluateExpression(innerExpression, context);
+    }
+
+    // Handle comparison operators
+    const comparisonOperators = ['===', '!==', '==', '!=', '>=', '<=', '>', '<'];
+
+    for (const op of comparisonOperators) {
+      if (expression.includes(op)) {
+        const [left, right] = expression.split(op, 2);
+        return evaluateComparison(left, op, right, context);
+      }
+    }
+
+    // If no comparison operator, just get the value and check truthiness
+    const value = getValue(expression, context);
+    return Boolean(value);
+  }
+
+  function parseTernary(expression, context = predefinedSources) {
+    // Enhanced ternary parsing to handle nested objects and complex conditions
+    const ternaryMatch = expression.match(/^(.+?)\s*\?\s*(.+?)\s*:\s*(.+)$/);
+
+    if (!ternaryMatch) {
+      return null;
+    }
+
+    const [, condition, trueValue, falseValue] = ternaryMatch;
+
+    try {
+      const conditionResult = evaluateLogical(condition.trim(), context);
+      const selectedValue = conditionResult ? trueValue.trim() : falseValue.trim();
+
+      // Parse the selected value
+      return parseLiteral(selectedValue) || selectedValue;
+    } catch (error) {
+      console.error('Error parsing ternary:', error);
+      return '';
+    }
   }
 
   function resolveString(str) {
+    // Check if this is a simple value (not a string with embedded placeholders)
+    if (typeof str !== 'string') {
+      return str;
+    }
+
+    // If the entire string is just a placeholder, handle it specially
+    const fullPlaceholderMatch = str.match(/^{{\s*(.*?)\s*}}$/);
+    if (fullPlaceholderMatch) {
+      const trimmedKey = fullPlaceholderMatch[1].trim();
+
+      // First, try to parse as a literal
+      let parsedValue = parseLiteral(trimmedKey);
+      if (parsedValue !== undefined) {
+        return parsedValue;
+      }
+
+      // Check for ternary operator
+      const ternaryResult = parseTernary(trimmedKey, predefinedSources);
+      if (ternaryResult !== null) {
+        return ternaryResult;
+      }
+
+      // Handle complex logical expressions
+      if (
+        trimmedKey.includes('===') ||
+        trimmedKey.includes('!==') ||
+        trimmedKey.includes('==') ||
+        trimmedKey.includes('!=') ||
+        trimmedKey.includes('>=') ||
+        trimmedKey.includes('<=') ||
+        trimmedKey.includes('>') ||
+        trimmedKey.includes('<') ||
+        trimmedKey.includes('&&') ||
+        trimmedKey.includes('||') ||
+        trimmedKey.startsWith('!')
+      ) {
+        try {
+          return evaluateLogical(trimmedKey, predefinedSources);
+        } catch (err) {
+          console.error('Error evaluating expression:', err);
+          return '';
+        }
+      }
+
+      // Handle standard property references
+      const value = getValue(trimmedKey, predefinedSources);
+      return value !== undefined ? value : '';
+    }
+
+    // Handle strings with embedded placeholders
     let resolved = str;
     let hasPlaceholders;
+    let iterations = 0;
+    const maxIterations = 10;
+
     do {
       hasPlaceholders = false;
-      resolved = resolved.replace(/{{(.*?)}}/g, (_, key) => {
+      iterations++;
+
+      if (iterations > maxIterations) {
+        console.warn('Maximum interpolation iterations reached');
+        break;
+      }
+
+      resolved = resolved.replace(/{{(.*?)}}/g, (match, key) => {
         const trimmedKey = key.trim();
-        const parsedValue = parseLiteral(trimmedKey);
+
+        // First, try to parse as a literal
+        let parsedValue = parseLiteral(trimmedKey);
         if (parsedValue !== undefined) {
-          return parsedValue;
+          hasPlaceholders = true;
+          return typeof parsedValue === 'object' ? JSON.stringify(parsedValue) : String(parsedValue);
         }
 
+        // Check for ternary operator
+        const ternaryResult = parseTernary(trimmedKey, predefinedSources);
+        if (ternaryResult !== null) {
+          hasPlaceholders = true;
+          return typeof ternaryResult === 'object' ? JSON.stringify(ternaryResult) : String(ternaryResult);
+        }
+
+        // Handle complex logical expressions
         if (
           trimmedKey.includes('===') ||
           trimmedKey.includes('!==') ||
+          trimmedKey.includes('==') ||
+          trimmedKey.includes('!=') ||
           trimmedKey.includes('>=') ||
           trimmedKey.includes('<=') ||
           trimmedKey.includes('>') ||
           trimmedKey.includes('<') ||
           trimmedKey.includes('&&') ||
           trimmedKey.includes('||') ||
-          trimmedKey.includes('!')
+          trimmedKey.startsWith('!')
         ) {
           try {
-            // Create a wrapper function that handles property access safely
-            const safeEval = (expr) => {
-              // Handle common property access patterns by pre-replacing them with safe access
-              const safeExpr = expr.replace(/(\w+(?:\.\w+)+)/g, (match) => {
-                return `safeGet(sources, '${match}')`;
-              });
-
-              // Create a sandbox for evaluation with the safe get function
-              return new Function(
-                'sources',
-                'safeGet',
-                `
-                try {
-                  return (${safeExpr});
-                } catch (e) {
-                  return false;
-                }
-              `
-              )(predefinedSources, safeGet);
-            };
-
-            const result = safeEval(trimmedKey);
-            return result ? 'true' : 'false';
+            const result = evaluateLogical(trimmedKey, predefinedSources);
+            hasPlaceholders = true;
+            return String(result);
           } catch (err) {
-            return 'false';
-          }
-        }
-
-        // Handle regular property access
-        const parts = trimmedKey.split('.');
-        let value = predefinedSources;
-        for (const part of parts) {
-          if (value && typeof value === 'object' && part in value) {
-            value = value[part];
-          } else {
+            console.error('Error evaluating expression:', err);
             return '';
           }
         }
 
-        hasPlaceholders = true;
-        if (typeof value === 'object') {
-          return JSON.stringify(value, null, 2);
+        // Handle standard property references
+        const value = getValue(trimmedKey, predefinedSources);
+
+        if (value === undefined) {
+          return '';
         }
-        return typeof value === 'function' ? value() : value;
+
+        hasPlaceholders = true;
+
+        // Handle different value types
+        if (typeof value === 'object' && value !== null) {
+          return JSON.stringify(value);
+        }
+
+        return String(value);
       });
-    } while (hasPlaceholders);
+    } while (hasPlaceholders && iterations < maxIterations);
+
     return resolved;
   }
 
   function parseLiteral(str) {
+    str = str.trim();
+
     try {
+      // Handle object literals
       if (str.startsWith('{') && str.endsWith('}')) {
-        const formattedStr = str.replace(/(\w+):/g, '"$1":');
+        // Fix unquoted keys
+        const formattedStr = str.replace(/(\w+)(?=\s*:)/g, '"$1"');
         return JSON.parse(formattedStr);
       }
+
+      // Handle array literals
       if (str.startsWith('[') && str.endsWith(']')) {
         return JSON.parse(str);
       }
+
+      // Handle boolean literals
       if (str === 'true') return true;
       if (str === 'false') return false;
-      if (!isNaN(str)) return Number(str);
+
+      // Handle null and undefined
+      if (str === 'null') return null;
+      if (str === 'undefined') return undefined;
+
+      // Handle numeric literals
+      if (!isNaN(str) && str !== '') return Number(str);
+
+      // Handle string literals
+      if ((str.startsWith('"') && str.endsWith('"')) ||
+        (str.startsWith("'") && str.endsWith("'"))) {
+        return str.slice(1, -1);
+      }
+
     } catch (err) {
+      // If parsing fails, return undefined to indicate it's not a literal
       return undefined;
     }
+
     return undefined;
   }
 
   function parseValue(value) {
     if (typeof value === 'string') {
-      const resolved = resolveString(value);
-      try {
-        return JSON.parse(resolved);
-      } catch {
-        return resolved;
-      }
+      return resolveString(value);
     } else if (Array.isArray(value)) {
+      // Recursively process arrays
       return value.map((item) => parseValue(item));
     } else if (value && typeof value === 'object') {
-      return Object.fromEntries(Object.entries(value).map(([key, val]) => [key, parseValue(val)]));
+      // Recursively process objects
+      return Object.fromEntries(
+        Object.entries(value).map(([key, val]) => [key, parseValue(val)])
+      );
     }
-    return value;
+    return value; // Return primitives as-is
   }
 
   return parseValue(template);
 }
+
+// Example usage:
+const template = "likes({{state.numberoflikes}})";
+const sources = {
+  state: {
+    numberoflikes: 3
+  }
+};
+
+// Output: "likes(3)"
 export function dotNotationKeysToObject(obj) {
   const result = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -597,11 +802,11 @@ export const getUrlDetails = (paramss = {}) => {
       // ipAddress: getPublicIP(),
       connection: navigator.connection
         ? {
-            type: navigator.connection.type,
-            effectiveType: navigator.connection.effectiveType,
-            downlinkMax: navigator.connection.downlinkMax,
-            saveData: navigator.connection.saveData,
-          }
+          type: navigator.connection.type,
+          effectiveType: navigator.connection.effectiveType,
+          downlinkMax: navigator.connection.downlinkMax,
+          saveData: navigator.connection.saveData,
+        }
         : null,
 
       // Additional Network Details
@@ -766,8 +971,8 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
 
         // Get the base object - if compId is missing, just use state.appState[process?.pageId]
         let result = process?.compId
-          ? state?.appState?.[process?.pageId]?.[process.compId]
-          : state?.appState?.[process?.pageId];
+          ? state?.appState?.[process.compId]
+          : state?.appState;
 
         // Handle multi-level property access by traversing the object
         if (result && parts.length) {

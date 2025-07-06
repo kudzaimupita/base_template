@@ -1,9 +1,12 @@
 import { getValueByPath, retrieveBody } from './utils';
 
 import _ from 'lodash';
-import { executeProcess } from '../digester';
+import { clearMemoizationCache, executeProcess, messageLogger, processBatch, Semaphore } from '../digester';
 import { generateObject } from './actions';
 import moment from 'moment';
+import { message } from 'antd';
+const BATCH_SIZE = 10; // Configurable batch size for concurrent processing
+const MAX_CONCURRENT_OPERATIONS = 5; // Limit concurrent operations to prevent overwhelming
 
 export const nativePlugins = {
   disabled: false,
@@ -168,129 +171,209 @@ export const nativePlugins = {
         }
       },
     },
-    {
-      key: 'loop',
-      label: 'Loop',
-      schema: {
+{
+  key: 'loop',
+  label: 'Loop',
+  schema: {
+    type: 'object',
+    properties: {
+      name: {
+        title: 'Name',
+        type: 'string',
+        pattern: '^[^.]+$',
+        description: 'No spaces, caps',
+      },
+      list: {
+        title: 'Array to Loop Over',
         type: 'object',
         properties: {
-          name: {
-            title: 'Name',
+          value: {
             type: 'string',
-            pattern: '^[^.]+$',
-            description: 'No spaces, caps ',
-          },
-          list: {
-            title: 'Array to Loop Over',
-            type: 'object',
-            properties: {
-              value: {
-                type: 'string',
-                title: 'Value',
-              },
-            },
-          },
-          assignToKey: {
-            title: 'Assign Key',
-            type: 'string',
-          },
-          appendToGlobal: {
-            title: 'Append To Global Return',
-            type: 'boolean',
-            default: true,
-          },
-          terminateOnError: {
-            title: 'Short Circuit On Error',
-            type: 'boolean',
-            default: true,
+            title: 'Value',
           },
         },
-        required: ['name', 'list'],
       },
-      process: async (
-        process,
-        globalObj,
-        globalErrors,
-        event,
-        currentLog,
-        appId,
-        navigate,
-        paramState,
-        sessionKey,
-        debug
-      ) => {
-        let list;
-        const localErrors = [];
-        const processes = process.sequence || [];
-        list = retrieveBody('', process?.list?.value, event, globalObj, paramState, sessionKey, process);
-        const data = list;
-
-        const res = [];
-        if (!_.isArray(data)) {
-          console.error(`Invalid list ${JSON.stringify(list)}`);
-          globalErrors[process.name] = `Invalid list ${JSON.stringify(list)}`;
-          return;
-        }
-        try {
-          async function processData() {
-            try {
-              const results = await Promise.all(
-                data?.map(async (item, index) => {
-                  try {
-                    // message.error(process?.compId);
-                    globalObj[`${process.name}._currentItem_`] = item;
-                    globalObj[`${process.name}._currentIndex_`] = index;
-
-                    const result = await executeProcess(
-                      0,
-                      processes.map((processItem) => {
-                        return {
-                          ...processItem,
-                          name: `${process.name}.${processItem.name}`,
-                          renderElementUtil: process?.renderElementUtil,
-                          currentItem: item,
-                          currentIndex: index,
-                          compId: process?.compId,
-                        };
-                      }),
-                      appId,
-                      navigate,
-                      paramState,
-                      debug,
-                      process.compId,
-                      process.pageId,
-                      event,
-                      process?.renderElementUtil,
-                      process?.editMode,
-                      process
-                    );
-                    return getValueByPath(result?.data, process.name);
-                  } catch (error) {
-                    console.error(`Error processing item at index ${index}:`, error);
-                    return null;
-                  } finally {
-                    delete globalObj[`${process.name}._currentItem_`];
-                    delete globalObj[`${process.name}._currentIndex_`];
-                  }
-                })
-              );
-              res.push(...results);
-            } catch (error) {
-              // message.error(JSON.stringify(error));
-              console.error('Error executing processes:', error);
-            }
-          }
-          await processData();
-          globalObj[process.name] = res;
-          if (localErrors.length > 0) {
-            globalErrors[process.name] = localErrors;
-          }
-        } catch (error) {
-          console.error('Error executing loop:', error);
-          globalErrors[process.name] = error;
-        }
+      assignToKey: {
+        title: 'Assign Key',
+        type: 'string',
+      },
+      appendToGlobal: {
+        title: 'Append To Global Return',
+        type: 'boolean',
+        default: true,
+      },
+      terminateOnError: {
+        title: 'Short Circuit On Error',
+        type: 'boolean',
+        default: true,
+      },
+      // New performance options
+      batchSize: {
+        title: 'Batch Size',
+        type: 'number',
+        default: BATCH_SIZE,
+        minimum: 1,
+        maximum: 100,
+      },
+      maxConcurrent: {
+        title: 'Max Concurrent Operations',
+        type: 'number',
+        default: 10,
+        minimum: 1,
+        maximum: 20,
       },
     },
+    required: ['name', 'list'],
+  },
+  process: async (
+    process,
+    globalObj,
+    globalErrors,
+    event,
+    currentLog,
+    appId,
+    navigate,
+    paramState,
+    sessionKey,
+    debug
+  ) => {
+    const startTime = performance.now();
+
+    let list;
+    const localErrors = [];
+    const processes = process.sequence || [];
+  
+    // Get the list data
+list = retrieveBody('', process?.list?.value, event, globalObj, paramState, sessionKey, process);
+
+// Cap to 25 items if in edit mode
+if (process.editMode === true && Array.isArray(list)) {
+  list = list.slice(0, 25);
+  messageLogger.warn('List capped at 25 items on editMode')
+}
+
+const data = list;
+
+    
+    if (!_.isArray(data)) {
+      messageLogger.error(`Invalid list ${JSON.stringify(list)}`);
+      globalErrors[process.name] = `Invalid list ${JSON.stringify(list)}`;
+      return;
+    }
+
+    if (data.length === 0) {
+      globalObj[process.name] = [];
+      return;
+    }
+
+    const batchSize = process.batchSize || BATCH_SIZE;
+    const maxConcurrent = process.maxConcurrent || MAX_CONCURRENT_OPERATIONS;
+    const semaphore = new Semaphore(maxConcurrent);
+    
+    messageLogger.info(`Starting optimized loop processing`, {
+      itemCount: data.length,
+      batchSize,
+      maxConcurrent,
+      processName: process.name
+    });
+
+    try {
+      // Optimized batch processing function
+      const processItem = async (item, index) => {
+        await semaphore.acquire();
+        
+        try {
+          // Set current item context more efficiently
+          const itemKey = `${process.name}._currentItem_`;
+          const indexKey = `${process.name}._currentIndex_`;
+          
+          globalObj[itemKey] = item;
+          globalObj[indexKey] = index;
+
+          // Create optimized process configuration
+          const optimizedProcesses = processes.map((processItem) => ({
+            ...processItem,
+            name: `${process.name}.${processItem.name}`,
+            renderElementUtil: process?.renderElementUtil,
+            currentItem: item,
+            currentIndex: index,
+            compId: process?.compId,
+          }));
+
+          const result = await executeProcess(
+            0,
+            optimizedProcesses,
+            appId,
+            navigate,
+            paramState,
+            debug,
+            process.compId,
+            process.pageId,
+            event,
+            process?.renderElementUtil,
+            process?.editMode,
+            process
+          );
+
+          // Clean up context immediately
+          delete globalObj[itemKey];
+          delete globalObj[indexKey];
+
+          return getValueByPath(result?.data, process.name);
+          
+        } catch (error) {
+          console.error(`Error processing item at index ${index}:`, error);
+          
+          if (process.terminateOnError) {
+            throw error;
+          }
+          
+          localErrors.push({ index, error: error.message });
+          return null;
+        } finally {
+          semaphore.release();
+        }
+      };
+
+      // Process in optimized batches
+      const results = await processBatch(data, batchSize, processItem);
+      
+      // Filter out null results (from errors) if not terminating on error
+      const validResults = results.filter(result => result !== null);
+      
+      globalObj[process.name] = validResults;
+
+      if (localErrors.length > 0 && !process.terminateOnError) {
+        globalErrors[process.name] = localErrors;
+      }
+
+      const duration = performance.now() - startTime;
+      messageLogger.success(`Optimized loop completed`, {
+        processName: process.name,
+        itemCount: data.length,
+        resultCount: validResults.length,
+        errorCount: localErrors.length,
+        duration: `${duration.toFixed(2)}ms`,
+        averagePerItem: `${(duration / data.length).toFixed(2)}ms`
+      });
+
+      // Clear memoization cache periodically
+      clearMemoizationCache();
+
+    } catch (error) {
+      const duration = performance.now() - startTime;
+      
+      messageLogger.error('Optimized loop execution failed', {
+        processName: process.name,
+        error: error.message,
+        duration: `${duration.toFixed(2)}ms`
+      });
+      
+      console.error('Error executing optimized loop:', error);
+      globalErrors[process.name] = error.message || error;
+    }
+  },
+},
     {
       key: 'array-isArray',
       label: 'Is Array',
@@ -385,7 +468,7 @@ export const nativePlugins = {
         body = retrieveBody('', process?.body?.value, event, globalObj, paramState, sessionKey, process);
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           const compactedArray = _.compact(body);
           globalObj[process.name] = compactedArray;
@@ -438,7 +521,7 @@ export const nativePlugins = {
         body = retrieveBody('', process?.body?.value, event, globalObj, paramState, sessionKey, process);
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           const uniqueArray = _.uniq(body);
           globalObj[process.name] = uniqueArray;
@@ -503,10 +586,10 @@ export const nativePlugins = {
         compareArray = retrieveBody('', process.compareArray?.value, event, globalObj, paramState, sessionKey, process);
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           if (!_.isArray(compareArray)) {
-            throw new Error('Comparison input is not an array.');
+            messageLogger.error('Comparison input is not an array.');
           }
           const diffArray = _.difference(body, compareArray);
           globalObj[process.name] = diffArray;
@@ -577,10 +660,10 @@ export const nativePlugins = {
         chunkSize = retrieveBody('', process.chunkSize?.value, event, globalObj, paramState, sessionKey, process);
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           if (!_.isNumber(chunkSize) || chunkSize < 1) {
-            throw new Error('Chunk size must be a positive integer.');
+            messageLogger.error('Chunk size must be a positive integer.');
           }
           const chunkedArray = _.chunk(body, chunkSize);
           globalObj[process.name] = chunkedArray;
@@ -633,7 +716,7 @@ export const nativePlugins = {
         body = retrieveBody('', process?.body?.value, event, globalObj, paramState, sessionKey, process);
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           const flattenedArray = _.flatten(body);
           globalObj[process.name] = flattenedArray;
@@ -686,7 +769,7 @@ export const nativePlugins = {
         body = retrieveBody('', process?.body?.value, event, globalObj, paramState, sessionKey, process);
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           const shuffledArray = _.shuffle(body);
           globalObj[process.name] = shuffledArray;
@@ -757,10 +840,10 @@ export const nativePlugins = {
         );
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           if (!_.isArray(compareArray)) {
-            throw new Error('Comparison input is not an array.');
+            messageLogger.error('Comparison input is not an array.');
           }
           const unionArray = _.union(body, compareArray);
           globalObj[process.name] = unionArray;
@@ -827,10 +910,10 @@ export const nativePlugins = {
         count = retrieveBody(process.count?.from, process.count?.value, event, globalObj, paramState, sessionKey, process);
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           if (!_.isNumber(count) || count < 1) {
-            throw new Error('Count must be a positive integer.');
+            messageLogger.error('Count must be a positive integer.');
           }
           const takenArray = _.take(body, count);
           globalObj[process.name] = takenArray;
@@ -908,10 +991,10 @@ export const nativePlugins = {
         );
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           if (!_.isPlainObject(predicate)) {
-            throw new Error('Predicate must be an object.');
+            messageLogger.error('Predicate must be an object.');
           }
           const foundItem = _.find(body, predicate);
           globalObj[process.name] = foundItem;
@@ -989,10 +1072,10 @@ export const nativePlugins = {
         );
         try {
           if (!_.isArray(body)) {
-            throw new Error('Input is not an array.');
+            messageLogger.error('Input is not an array.');
           }
           if (!_.isPlainObject(predicate)) {
-            throw new Error('Predicate must be an object.');
+            messageLogger.error('Predicate must be an object.');
           }
           const filteredItems = _.filter(body, predicate);
           globalObj[process.name] = filteredItems;
@@ -2924,7 +3007,7 @@ export const nativePlugins = {
           } else if (typeof body === 'string') {
             length = body.length;
           } else {
-            throw new Error('Body must be an array or a string');
+            messageLogger.error('Body must be an array or a string');
           }
           globalObj[process.name] = length;
         } catch (error) {
@@ -5917,12 +6000,12 @@ export const nativePlugins = {
               const val = retrieveBody(item.from, item.value, event, globalObj, paramState, sessionKey, process);
               const num = parseFloat(val);
               if (isNaN(num)) {
-                throw new Error(`Invalid number in group: ${val}`);
+                messageLogger.error(`Invalid number in group: ${val}`);
               }
               return num;
             });
             if (values.length === 0) {
-              throw new Error('No values provided in group');
+              messageLogger.error('No values provided in group');
             }
             let groupResult;
             switch (group.operation) {
@@ -5937,7 +6020,7 @@ export const nativePlugins = {
                 break;
               case 'divide':
                 if (values.includes(0)) {
-                  throw new Error('Cannot divide by zero within group');
+                  messageLogger.error('Cannot divide by zero within group');
                 }
                 groupResult = values.reduce((acc, val) => acc / val);
                 break;
@@ -5957,7 +6040,7 @@ export const nativePlugins = {
                 groupResult = Math.max(...values);
                 break;
               default:
-                throw new Error(`Unsupported group operation: ${group.operation}`);
+                messageLogger.error(`Unsupported group operation: ${group.operation}`);
             }
             groupResults.push(groupResult);
           }
@@ -5977,7 +6060,7 @@ export const nativePlugins = {
               break;
             case 'divide':
               if (groupResults.includes(0)) {
-                throw new Error('Cannot divide by zero between groups');
+                messageLogger.error('Cannot divide by zero between groups');
               }
               finalResult = groupResults.reduce((acc, val) => acc / val);
               break;
@@ -5997,7 +6080,7 @@ export const nativePlugins = {
               finalResult = Math.max(...groupResults);
               break;
             default:
-              throw new Error(`Unsupported combine operation: ${process.combine.operation}`);
+              messageLogger.error(`Unsupported combine operation: ${process.combine.operation}`);
           }
           globalObj[process.name] = finalResult;
         } catch (error) {
