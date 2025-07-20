@@ -33,13 +33,13 @@ const DebugWrapper = ({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Render children as-is */}
+            {}
             {children}
 
-            {/* Debug indicators - positioned absolutely within this container */}
+            {}
             {(hasEventHandlers || hasEffects) && (
                 <>
-                    {/* Corner activity indicator */}
+                    {}
                     <div
                         className="absolute top-0 right-0 z-40 pointer-events-none"
                         style={{ transform: 'translate(50%, -50%)' }}
@@ -50,7 +50,7 @@ const DebugWrapper = ({
                         />
                     </div>
 
-                    {/* Badges */}
+                    {}
                     <div className="absolute -top-2 -right-2 z-50 flex gap-1 pointer-events-none">
                         {hasEventHandlers && (
                             <div className="bg-blue-500 text-white px-1.5 py-0.5 rounded-full text-xs font-medium shadow-lg flex items-center gap-1">
@@ -67,7 +67,7 @@ const DebugWrapper = ({
                         )}
                     </div>
 
-                    {/* Hover tooltip */}
+                    {}
                     {isHovered && showDetails && (
                         <div className="absolute -top-24 right-0 bg-gray-900 text-white p-3 rounded-lg shadow-xl border border-gray-700 min-w-48 pointer-events-none z-50">
                             <div className="text-sm font-semibold mb-2 text-blue-300">{label}</div>
@@ -100,7 +100,7 @@ const DebugWrapper = ({
                                 </div>
                             )}
 
-                            {/* Tooltip arrow */}
+                            {}
                             <div className="absolute top-full right-2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                         </div>
                     )}

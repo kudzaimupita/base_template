@@ -1,4 +1,3 @@
-// import { retrieveBody } from '../digest/state/utils';
 import React from 'react';
 import { processController } from './digest/digester';
 import { EVENT_HANDLERS } from './eventHandlersTypes';
@@ -7,11 +6,7 @@ import InlineEditText from './InLineTextEditor';
 import { IconRenderer } from './IconRenderer';
 import { retrieveBody } from './digest/state/utils';
 import { message } from 'antd';
-// import InlineEditText from '../InLineTextEditor';
-// import { IconRenderer } from '../IconRenderer';
-// import { isEmpty } from 'lodash';
-// import { EVENT_HANDLERS } from '../eventHandlersTypes';
-// import { processController } from '../digest/digester';
+import renderElementUtil from './renderElementUtil';
 
 export function createEventHandler(e, processToRun, elementId, currentApplication, navigate, params, tab, editMode, store, refreshAppAuth, setDestroyInfo, setSessionInfo, setAppStatePartial, storeInvocation) {
   return processController(
@@ -37,18 +32,20 @@ export function createEventHandler(e, processToRun, elementId, currentApplicatio
   );
 }
 
-export function createEventHandlers(item, currentApplication, navigate, params, tab, editMode, store, refreshAppAuth, setDestroyInfo, setSessionInfo, setAppStatePartial, storeInvocation) {
+export function createEventHandlers(item, currentApplication, navigate, params, tab, editMode, store, refreshAppAuth, setDestroyInfo, setSessionInfo, setAppStatePartial, storeInvocation,dispatch,allElements, setElements, appState, createEventHandlerss) {
   const handlers = {};
 
   Object.keys(EVENT_HANDLERS).forEach((eventName) => {
       
-
        if (isEmpty(item?.configuration?.[eventName])) return;
 
     const configHandler = item?.configuration?.[eventName];
-  
-    if (!isEmpty(configHandler)) {
+    // message.error(eventName)
+ 
+    if (configHandler?.plugins?.length> 0) {
+     
       handlers[eventName] = (e) => {
+  
         if (item?.configuration?.[eventName]?.preventDefault) {
           e.preventDefault();
         }
@@ -56,12 +53,40 @@ export function createEventHandlers(item, currentApplication, navigate, params, 
           e.stopPropagation();
         }
 
-        if (!isEmpty(configHandler?.plugins)) {
-        
-          handlers[eventName] = (e) => {
-            return createEventHandler(e, configHandler, item.i, currentApplication, navigate, params, tab, editMode, store, refreshAppAuth, setDestroyInfo, setSessionInfo, setAppStatePartial, storeInvocation);
-          };
-        }
+                //  return processController(
+                //       configHandler,
+                //       e     ,
+                //       currentApplication?._id,
+                //       navigate,
+                //       params,
+                //       'eventHandler',
+                //       item?.i,
+                //       (process) => '',
+                //       tab,
+                //       (process) =>
+                //         renderElementUtil(
+                //           { ...process, store, allElements },
+                //           allElements,
+                //           setElements,
+                //           appState,
+                //           dispatch,
+                //           tab,
+                //           createEventHandlerss,
+                //           editMode,
+                //           extractValue,
+                //           setAppStatePartial,
+                //           currentApplication
+                //         ),
+                //       editMode,
+                //       {
+                //         store: store,
+                //         refreshAppAuth: refreshAppAuth,
+                //         setDestroyInfo: setDestroyInfo,
+                //         setSessionInfo: setSessionInfo,
+                //         setAppStatePartial: setAppStatePartial,
+                //         storeInvocation: storeInvocation,
+                //       }
+                //     );
         return createEventHandler(e, configHandler, item.i, currentApplication, navigate, params, tab, editMode, store, refreshAppAuth, setDestroyInfo, setSessionInfo, setAppStatePartial, storeInvocation);
       };
     }
@@ -258,7 +283,6 @@ export function cleanItemProperties(item) {
   return cleanedItem;
 }
 
-// Optimized version with memoization and reduced object creation
 const memoCache = new Map();
 
 export function syncParentChildRelationships(components) {
@@ -508,7 +532,6 @@ export function convertParentViewToLayoutItem(view, id) {
   return [pageContainer, ...allProcessedElements];
 }
 
-// Optimized processObjectTemplatesAndReplace with memoization
 const templateCache = new Map();
 
 export function processObjectTemplatesAndReplace(obj, process, mapItem, tab) {
@@ -583,7 +606,6 @@ export function processObjectTemplatesAndReplace(obj, process, mapItem, tab) {
   return result;
 }
 
-// Optimized extractValue with path caching
 const pathCache = new Map();
 
 export function extractValue(obj, template = '') {
@@ -615,7 +637,6 @@ export function extractValue(obj, template = '') {
   return result;
 }
 
-// Clear caches periodically to prevent memory leaks
 export function clearOptimizationCaches() {
   memoCache.clear();
   templateCache.clear();
@@ -643,7 +664,7 @@ export function createBaseProps(item, index, isHovered, readOnly, editMode, seti
       }
     },
     style: processedStyle,
-    className: `opacdity-25 ${item?.isGroup ? 'group-container ' : ''}${item?.configuration?.classNames || ''} ${builderCursorMode === 'hand' ? 'cursor-grab active:cursor-grabbing !pointer-events-none' : builderCursorMode === 'draw' ? '!cursor-draw !pointer-events-none !disabled' : builderCursorMode === 'path' ? 'cursor-path' : builderCursorMode === 'comment' ? '!cursor-comment !pointer-events-none' : editMode && !isDrawingPathActive && builderCursorMode === 'default' ? `${!isLayout && 'cube'} active:cursor-grabbing` : `${!isLayout && 'cube'}  active:cursor-grabbing`}`,
+    className: `${item?.isGroup ? 'group-container ' : ''}${item?.configuration?.classNames || ''} ${builderCursorMode === 'hand' ? 'cursor-grab active:cursor-grabbing !pointer-events-none' : builderCursorMode === 'draw' ? '!cursor-draw !pointer-events-none !disabled' : builderCursorMode === 'path' ? 'cursor-path' : builderCursorMode === 'comment' ? '!cursor-comment !pointer-events-none' : editMode && !isDrawingPathActive && builderCursorMode === 'default' ? `${!isLayout && 'cube'} active:cursor-grabbing` : `${!isLayout && 'cube'}  active:cursor-grabbing`}`,
     ...(editMode ? {} : { events: createEventHandlers(item) }),
     ...(editMode ? {} : createEventHandlers(item)),
   };

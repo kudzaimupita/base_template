@@ -12,6 +12,7 @@ import { twMerge } from 'tailwind-merge';
 import { useParams } from 'react-router-dom';
 import { convertParentViewToLayoutItem, createEventHandlers, extractValue, processObjectTemplatesAndReplace, renderComponent, SELF_CLOSING_TAGS, syncParentChildRelationships } from './utils';
 import { message } from 'antd';
+import { SortableContainerSetup } from './Setup';
 
 const ElementRendererContext = createContext(null);
 
@@ -23,7 +24,6 @@ const useElementRenderer = () => {
   return context;
 };
 
-// Optimize element processing with better memoization
 const processElement = (oldItem) => {
   const processedItem = { ...oldItem };
   const keysToDelete = [
@@ -43,16 +43,20 @@ const processElement = (oldItem) => {
   return processedItem;
 };
 
-// Cache for processed elements
 const elementCache = new WeakMap();
 
-// Memoized component with aggressive optimization
+interface ElementItemProps {
+  item: any;
+  index: number;
+  allElements: any[];
+  renderingStack?: Set<any>;
+}
 const ElementItem = React.memo(({
   item: oldItem,
   index,
   allElements,
   renderingStack = new Set(),
-}) => {
+}: ElementItemProps) => {
   const context = useElementRenderer();
   const {
     isLayout,
@@ -359,7 +363,12 @@ const ElementItem = React.memo(({
       setDestroyInfo,
       setAppStatePartial,
       setAppStatePartial,
-      storeInvocation
+      storeInvocation,
+      dispatch,
+      allElements,
+      setElements,
+      appState,
+      createEventHandlers
     );
   }, [
     editMode,
@@ -411,21 +420,24 @@ const ElementItem = React.memo(({
         }
       },
       style: processedStyle,
-      className: `opacdity-25 ${item?.isGroup ? 'group-container ' : ''}${twMerge(itemConfiguration?.classNames)} ${cursorClass}`,
+      className: `${item?.isGroup ? 'group-container ' : ''}${twMerge(itemConfiguration?.classNames)} ${cursorClass}`,
       ...eventHandlers,
     };
    const stateConfig = appState?.[item.i] || {};
     const props = processObjectTemplatesAndReplace({
+      id:item.i,
       ...flattenStyleObject(
         {
           ...baseProps,
           ...itemConfiguration,
           ...flattenStyleObject(item?.configuration, item?.style?.transform, editMode),
           ...baseProps.events,
+          ...eventHandlers,
           ...stateConfig
         },
         item?.configuration?.transform,
-        editMode
+        editMode,
+  
       ),
     }, {
       event: {},
@@ -549,10 +561,10 @@ const ElementItem = React.memo(({
         );
       }
 
+   
       const viewElements = syncParentChildRelationships([...convertParentViewToLayoutItem(elementss, item.i)]) || [];
-      
       if (viewElements.length > 0) {
-        ensureChildrenInGlobalElements(viewElements);
+        ensureChildrenInGlobalElements(viewElements?.filter((it)=>it.parent));
       }
 
       const newRenderingStack = new Set(renderingStack);
@@ -635,13 +647,18 @@ const ElementItem = React.memo(({
   );
 });
 
-// Optimize ElementRenderer with better filtering
+interface ElementRendererProps {
+  allElements: any[];
+  parentId?: string | null;
+  isWrapper?: boolean;
+  renderingStack?: Set<any>;
+}
 const ElementRenderer = React.memo(({
   allElements,
   parentId = null,
   isWrapper = false,
   renderingStack = new Set(),
-}) => {
+}: ElementRendererProps) => {
   const {
     editMode,
     currentApplication,
@@ -700,9 +717,19 @@ const ElementRenderer = React.memo(({
         filtered.push(item);
       }
     }
-
+    const handleDOMError = () => {
+     
+      
+      // Reset to original state
+      // setElements([...allElements]);
+      
+      // Or reload from server/localStorage/etc.
+      // loadElementsFromSource().then(setElements);
+      
+    };
+  
     return filtered.map((item, index) => (
-      <ErrorBoundary key={`${item.i}-${tab}-${item.isVirtual ? 'v' : 'n'}`} fallback={<p>Error</p>}>
+      <ErrorBoundary onDOMError={handleDOMError} key={`${item.i}-${tab}-${item.isVirtual ? 'v' : 'n'}`} fallback={<p>Error</p>}>
         <DebugWrapper
           configuration={item?.configuration}
           enabled={editMode && currentApplication?.builderSettings?.anatomy}
@@ -734,8 +761,15 @@ const ElementRenderer = React.memo(({
   return <>{filteredElements}</>;
 });
 
-// Optimize context provider with better element processing
-const ElementRendererWithContext = React.memo((props) => {
+interface ElementRendererWithContextProps {
+  elements: any[];
+  setElements?: (elements: any[]) => void;
+  parentId?: string | null;
+  isWrapper?: boolean;
+  tab?: string;
+}
+
+const ElementRendererWithContext = React.memo((props: ElementRendererWithContextProps) => {
   // Use Map for better performance with large element lists
   const cleanedElements = useMemo(() => {
     if (!props.elements || !Array.isArray(props.elements)) {
@@ -766,11 +800,13 @@ const ElementRendererWithContext = React.memo((props) => {
   // Deep memo for context value to prevent unnecessary re-renders
   const contextValue = useMemo(() => ({
     ...props,
-    elements: cleanedElements
+    elements: cleanedElements,
+    setElements: props.setElements,
   }), [props, cleanedElements]);
 
   return (
     <ElementRendererContext.Provider value={contextValue}>
+    {props.editMode && <SortableContainerSetup elementss={cleanedElements} setElements={props.setElements} />}  
       <ElementRenderer
         allElements={cleanedElements}
         parentId={props.parentId}

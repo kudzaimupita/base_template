@@ -4,7 +4,6 @@ import { statePlugin } from './state/actions';
 import { tempStore } from './tempStore';
 import { message } from 'antd';
 
-// Performance optimizations
 const BATCH_SIZE = 10; // Configurable batch size for concurrent processing
 const MAX_CONCURRENT_OPERATIONS = 5; // Limit concurrent operations to prevent overwhelming
 
@@ -32,7 +31,6 @@ const getOperations = () => {
   return allOperations;
 };
 
-// Optimized memoization with size limit
 const memoizedDotNotation = _.memoize(
   (obj) => {
     const result = {};
@@ -44,7 +42,6 @@ const memoizedDotNotation = _.memoize(
   (obj) => JSON.stringify(obj)
 );
 
-// Clear memoization cache periodically to prevent memory leaks
 let memoizationClearCounter = 0;
 export const clearMemoizationCache = () => {
   if (++memoizationClearCounter > 100) {
@@ -53,7 +50,6 @@ export const clearMemoizationCache = () => {
   }
 };
 
-// Optimized Message Logger with batching
 class MessageLogger {
   constructor() {
     this.messages = [];
@@ -217,7 +213,7 @@ class MessageLogger {
       try {
         callback(logEntry);
       } catch (error) {
-        console.error('Error in message logger subscriber:', error);
+        // console.error('Error in message logger subscriber:', error);
       }
     });
   }
@@ -280,7 +276,6 @@ class MessageLogger {
 
 const messageLogger = new MessageLogger();
 
-// Optimized StateManager
 class StateManager {
   constructor() {
     this.obj = {};
@@ -350,7 +345,6 @@ class StateManager {
 
 const stateManager = new StateManager();
 
-// Optimized operation finder with better caching
 export const findOperation = (type) => {
   if (operationsCache.has(type)) {
     return operationsCache.get(type);
@@ -366,7 +360,6 @@ export const findOperation = (type) => {
   return op;
 };
 
-// Batch processing utility for better performance
 export async function processBatch(items, batchSize, processor) {
   const results = [];
   
@@ -381,7 +374,6 @@ export async function processBatch(items, batchSize, processor) {
   return results;
 }
 
-// Semaphore for limiting concurrent operations
 export class Semaphore {
   constructor(maxConcurrent) {
     this.maxConcurrent = maxConcurrent;
@@ -410,13 +402,8 @@ export class Semaphore {
   }
 }
 
-// OPTIMIZED LOOP OPERATION
-// const optimizedLoopOperation = ;
 
-// Export the optimized loop operation
-// export { optimizedLoopOperation };
 
-// Additional utility functions for performance monitoring
 export const getPerformanceMetrics = () => ({
   operationsCacheSize: operationsCache.size,
   stateManagerCacheSize: stateManager.stateCache?.size || 0,
@@ -431,7 +418,6 @@ export const clearAllCaches = () => {
   messageLogger.batchedLogs = [];
 };
 
-// Your existing exports with optimizations
 export { messageLogger };
 export const logMessage = (level, message, context) => messageLogger.log(level, message, context);
 export const logInfo = (message, context) => messageLogger.info(message, context);
@@ -440,7 +426,6 @@ export const logError = (message, context) => messageLogger.error(message, conte
 export const logDebug = (message, context) => messageLogger.debug(message, context);
 export const logSuccess = (message, context) => messageLogger.success(message, context);
 
-// Optimized versions of your existing functions
 export const processHit = async (
   process,
   operations,
@@ -567,6 +552,7 @@ export const executeProcess = async (
       editMode,
       config
     );
+    message.info(`Process executed successfully at step ${index}`)
   } catch (error) {
 
     messageLogger.error(`Process execution failed at step ${index}`, {

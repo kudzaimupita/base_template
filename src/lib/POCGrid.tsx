@@ -228,7 +228,7 @@ const ResponsiveGridLayout = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 p-4">
-            {/* Header */}
+            {}
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">
                     Responsive Grid Layout
@@ -257,7 +257,7 @@ const ResponsiveGridLayout = () => {
                 </div>
             </div>
 
-            {/* Grid Container */}
+            {}
             <div
                 ref={containerRef}
                 className="relative bg-white rounded-lg shadow-sm border min-h-96"
@@ -318,7 +318,7 @@ const ResponsiveGridLayout = () => {
                 )}
             </div>
 
-            {/* Info Panel */}
+            {}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-lg shadow">
                     <h3 className="font-semibold text-gray-800 mb-2">Current Layout</h3>

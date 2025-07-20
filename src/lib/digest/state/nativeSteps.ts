@@ -246,7 +246,6 @@ export const nativePlugins = {
     // Get the list data
 list = retrieveBody('', process?.list?.value, event, globalObj, paramState, sessionKey, process);
 
-// Cap to 25 items if in edit mode
 if (process.editMode === true && Array.isArray(list)) {
   list = list.slice(0, 25);
   messageLogger.warn('List capped at 25 items on editMode')

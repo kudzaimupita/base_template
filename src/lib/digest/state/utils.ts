@@ -649,7 +649,6 @@ function secureInterpolate(template, sources) {
   return parseValue(template);
 }
 
-// Example usage:
 const template = "likes({{state.numberoflikes}})";
 const sources = {
   state: {
@@ -657,7 +656,6 @@ const sources = {
   }
 };
 
-// Output: "likes(3)"
 export function dotNotationKeysToObject(obj) {
   const result = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -874,7 +872,6 @@ export const getUrlDetails = (paramss = {}) => {
   };
 };
 
-// Utility function to get IP (requires external service)
 export const getPublicIP = async () => {
   try {
     const response = await fetch('https://api.ipify.org?format=json');

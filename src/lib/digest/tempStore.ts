@@ -47,5 +47,4 @@ const tempStore = {
   },
 };
 
-// Export the store so it can be accessed from other modules
 export { tempStore };

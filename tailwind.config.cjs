@@ -9,74 +9,192 @@ module.exports = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}', './src/**/*.{html,js,ts,jsx,tsx,vue}'],
   darkMode: ['class'],
   safelist: [
+    // ========================================
+    // LAYOUT & SIZING
+    // ========================================
+
     // Specific sizes
     'w-[1600px]',
     'h-[436px]',
 
-    // CSS Variable utilities - force include these
+    // Width & Height with CSS variables
+    'w-[var(--width)]',
+    'h-[var(--height)]',
+
+    // Z-index
     'z-[var(--z-index)]',
-    'w-[var(--width)]',
-    'h-[var(--height)]',
-    'w-[var(--width)]',
-    'h-[var(--height)]',
+
+    // ========================================
+    // SPACING
+    // ========================================
+
+    // Margin
     'm-[var(--margin)]',
     'mx-[var(--margin-x)]',
     'my-[var(--margin-y)]',
-    'ml-[var(--margin-y)]',
+    'ml-[var(--margin-left)]',
     'mr-[var(--margin-right)]',
     'mt-[var(--margin-top)]',
     'mb-[var(--margin-bottom)]',
-    'left-[var(--left)]',
-    'right-[var(--left)]',
-    'top-[var(--top)]',
-    'bottom-[var(--bottom)]',
-    'rotate-[var(--rotate)]',
-    'scale-[var(--scale)]',
-    'x-[var(--translate-x)]',
-    'translate-y-[var(--translate-y)]',
-    'opacity-[var(--opacity)]',
-    'filter-[var(--filter)]',
-    'brightness-[var(-brightness)]',
-    'blur-[var(-blur)]',
-    'brightness-[var(-brightness)]',
-    'contrast-[var(-contrast)]',
-    'grayscale-[var(-grayscale)]',
-    'hue-rotate-[var(-hue-rotate)]',
-    'invert-[var(-invert)]',
-    'saturate-[var(-saturate)]',
-    'sepia-[var(-sepia)]',
-    'drop-shadow-[var(-drop-shadow)]',
-    'duration-[var(--transition-duration)]',
-    'delay-[var(--mix-blend)]',
-    'border-[var(--border-color)]',
-    'border-[var(--border-width)]',
-    'rounded-[var(--rounded)]',
 
+    // Padding
     'p-[var(--padding)]',
+    'px-[var(--padding-x)]',
+    'py-[var(--padding-y)]',
     'pt-[var(--padding-top)]',
     'pb-[var(--padding-bottom)]',
     'pl-[var(--padding-left)]',
     'pr-[var(--padding-right)]',
-    'px-[var(--padding-x)]',
-    'py-[var(--padding-y)]',
+
+    // ========================================
+    // POSITIONING
+    // ========================================
+
+    'left-[var(--left)]',
+    'right-[var(--right)]',
+    'top-[var(--top)]',
+    'bottom-[var(--bottom)]',
+
+    // ========================================
+    // TRANSFORMS
+    // ========================================
+
+    'rotate-[var(--rotate)]',
+    'scale-[var(--scale)]',
+    'translate-x-[var(--translate-x)]',
+    'translate-y-[var(--translate-y)]',
+
+    // ========================================
+    // BORDERS - Width
+    // ========================================
+
+    // Unified border width
+    'border-[length:var(--border-width)]', // ✅ FIXED: Added 'length:'
+
+    // Individual sides with property syntax
+    '[border-top-width:var(--border-top-width)]', // ✅ Correct
+    '[border-bottom-width:var(--border-bottom-width)]', // ✅ Correct
+    '[border-left-width:var(--border-left-width)]', // ✅ Correct
+    '[border-right-width:var(--border-right-width)]', // ✅ Correct
+
+    // Axis borders with Tailwind classes
+    'border-x-[length:var(--border-x-width)]', // ✅ FIXED: Added 'length:'
+    'border-y-[length:var(--border-y-width)]', // ✅ FIXED: Added 'length:'
+
+    // Individual sides with Tailwind classes
+    'border-t-[length:var(--border-top-width)]', // ✅ FIXED: Added 'length:'
+    'border-b-[length:var(--border-bottom-width)]', // ✅ FIXED: Added 'length:'
+    'border-l-[length:var(--border-left-width)]', // ✅ FIXED: Added 'length:'
+    'border-r-[length:var(--border-right-width)]', // ✅ FIXED: Added 'length:'
+
+    // ========================================
+    // BORDERS - Color
+    // ========================================
+
+    // Unified border color
+    'border-[color:var(--border-color)]', // ✅ FIXED: Added 'color:'
+    '[border-color:var(--border-color)]', // ✅ Correct
+
+    // Individual side colors with property syntax
+    '[border-top-color:var(--border-top-color)]', // ✅ Correct
+    '[border-bottom-color:var(--border-bottom-color)]', // ✅ Correct
+    '[border-left-color:var(--border-left-color)]', // ✅ Correct
+    '[border-right-color:var(--border-right-color)]', // ✅ Correct
+
+    // Individual side colors with Tailwind classes
+    'border-t-[color:var(--border-top-color)]', // ✅ FIXED: Added 'color:'
+    'border-b-[color:var(--border-bottom-color)]', // ✅ FIXED: Added 'color:'
+    'border-l-[color:var(--border-left-color)]', // ✅ FIXED: Added 'color:'
+    'border-r-[color:var(--border-right-color)]', // ✅ FIXED: Added 'color:'
+
+    // ========================================
+    // BORDERS - Style
+    // ========================================
+
+    // These are all correct - standard Tailwind classes
+    'border-solid', // ✅ Correct
+    'border-dashed', // ✅ Correct
+    'border-dotted', // ✅ Correct
+    'border-double', // ✅ Correct
+    'border-none', // ✅ Correct
+
+    // Individual side border styles
+    'border-t-solid', // ✅ Correct
+    'border-b-solid', // ✅ Correct
+    // ... all the rest are correct
+
+    // ========================================
+    // OUTLINE
+    // ========================================
+
+    // Outline width with CSS variables
+    'outline-[length:var(--outline-width)]', // ✅ FIXED: Added 'length:'
+    '[outline-width:var(--outline-width)]', // ✅ Correct
+
+    // Outline color with CSS variables
+    'outline-[color:var(--outline-color)]', // ✅ FIXED: Added 'color:'
+    '[outline-color:var(--outline-color)]', // ✅ Correct
+
+    // Outline offset
+    'outline-offset-[length:var(--outline-offset)]', // ✅ FIXED: Added 'length:'
+
+    // Outline styles
+    'outline', // ✅ Correct
+    'outline-none', // ✅ Correct
+    'outline-dashed', // ✅ Correct
+    'outline-dotted', // ✅ Correct
+    'outline-double', // ✅ Correct
+
+    // ========================================
+    // VISUAL EFFECTS
+    // ========================================
+
+    // Opacity
+    'opacity-[var(--opacity)]',
+
+    // Filters
+    'filter-[var(--filter)]',
+    'blur-[var(--blur)]',
+    'backdrop-blur-[var(--backdrop-blur)]',
+    'brightness-[var(--brightness)]',
+    'contrast-[var(--contrast)]',
+    'grayscale-[var(--grayscale)]',
+    'hue-rotate-[var(--hue-rotate)]',
+    'invert-[var(--invert)]',
+    'saturate-[var(--saturate)]',
+    'sepia-[var(--sepia)]',
+
+    // Shadows
+    'drop-shadow-[var(--drop-shadow)]',
+    '[box-shadow:var(--shadow)]',
+    '[box-shadow:var(--inset-shadow)]',
+    '[box-shadow:var(--combined-shadow)]',
+
+    // Mix blend
+    'mix-blend-difference',
+    'delay-[var(--mix-blend)]',
+
+    // ========================================
+    // ANIMATION & TRANSITIONS
+    // ========================================
+
+    'duration-[var(--transition-duration)]',
+
+    // ========================================
+    // BORDER RADIUS
+    // ========================================
 
     'rounded-[var(--rounded)]',
-    'rounded-t-[var(--rounded-t)]',
-    'rounded-b-[var(--rounded-b)]',
-    'rounded-l-[var(--rounded-l)]',
-    'rounded-r-[var(--rounded-r)]',
-    'rounded-tl-[var(--rounded-tl)]',
-    'rounded-tr-[var(--rounded-tr)]',
-    'rounded-bl-[var(--rounded-bl)]',
-    'rounded-br-[var(--rounded-br)]',
-    'text-[var(--text-color)]',
 
-    // Custom utility classes
-    // 'z-var',
-    // 'w-var',
-    // 'h-var',
-    // 'rotate-var',
-    // 'transform-var',
+    // ========================================
+    // BACKGROUNDS & COLORS
+    // ========================================
+
+    // Background color
+    'bg-[var(--bg-color)]',
+
+    // Background image
+    'bg-[image:var(--bg-image)]',
 
     // Gradient directions
     'bg-gradient-to-r',
@@ -88,16 +206,21 @@ module.exports = {
     'bg-gradient-to-br',
     'bg-gradient-to-bl',
 
-    // Specific gradient colors you're using
+    // Specific gradient colors
     'from-[#0A0A0B]',
     'to-[#1A1A2E]',
     'from-[#00D4FF]',
     'via-[#7B2FFF]',
     'to-[#00FF88]',
-' bg-gradient-to-br from-[#1A1A2E] to-[#121218] ',
+    'bg-gradient-to-br from-[#1A1A2E] to-[#121218]',
+
     // Background clip and text utilities
     'bg-clip-text',
     'text-transparent',
+
+    // ========================================
+    // DYNAMIC PATTERNS
+    // ========================================
 
     // Standard gradient colors
     {
@@ -280,7 +403,7 @@ module.exports = {
         `bg-gradient-to-tl`,
         `bg-gradient-to-br`,
         `bg-gradient-to-bl`,
-        'border-[#00FF88]/30'
+        'border-[#00FF88]/30',
       ],
     }),
     require('@tailwindcss/typography'),

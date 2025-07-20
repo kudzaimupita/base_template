@@ -65,7 +65,6 @@ const renderElementUtil = (
    */
   const processPropertyMappings = (elementId, newElementId = null,originalId) => {
     const effectiveElementId = newElementId || elementId;
-// message.info(originalId)
     propsMap.forEach((mapItem) => {
       if (mapItem?.element === originalId) {
         // message.info('jj')
@@ -274,7 +273,8 @@ const renderElementUtil = (
       // Process property mappings for the parent element
       processPropertyMappings(
         isViewBlueprint ? blueprint.i : process?.propsMapper?.blueprint,
-        newElementId
+        newElementId,
+        isViewBlueprint ? blueprint.i : process?.propsMapper?.blueprint
       );
 
       // Add the new element and all its children to the updated elements array
@@ -290,14 +290,14 @@ const renderElementUtil = (
       // Handle view blueprint injection
 
       // Process mappings and defaults for the main blueprint element
-      processPropertyMappings(blueprint.i);
+      processPropertyMappings(blueprint.i,blueprint.i,blueprint.i);
       processDefaultValues(blueprint.i);
       setCurrentItemForElement(blueprint.i);
 
       // Process mappings and defaults for all view elements
       viewElements.forEach((viewElement) => {
         if (viewElement.i !== blueprint.i) {
-          processPropertyMappings(viewElement.i);
+          processPropertyMappings(viewElement.i, viewElement.i, viewElement.i);
           processDefaultValues(viewElement.i);
           setCurrentItemForElement(viewElement.i);
         }
@@ -355,10 +355,10 @@ const renderElementUtil = (
 
     } else {
       // Handle regular element injection
-
+      message.info('process?.propsMapper?.renderType')
       // Process property mappings for all mapped elements
       propsMap.forEach((mapItem) => {
-        processPropertyMappings(mapItem?.element);
+        processPropertyMappings(mapItem?.element,mapItem?.element,mapItem?.element);
         setCurrentItemForElement(mapItem?.element);
       });
 

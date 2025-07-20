@@ -20,7 +20,7 @@ const TailwindClassInput = ({ value = '', onChange, placeholder = 'Search Tailwi
         sizing: ['w-full', 'w-auto', 'w-1/2', 'w-1/3', 'w-2/3', 'w-1/4', 'w-3/4', 'w-fit', 'w-screen', 'h-full', 'h-auto', 'h-screen', 'h-fit', 'min-w-0', 'min-w-full', 'max-w-none', 'max-w-xs', 'max-w-sm', 'max-w-md', 'max-w-lg', 'max-w-xl', 'max-w-2xl', 'max-w-4xl', 'max-w-6xl', 'max-w-full'],
         typography: ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl', 'font-light', 'font-normal', 'font-medium', 'font-semibold', 'font-bold', 'italic', 'uppercase', 'lowercase', 'capitalize', 'underline', 'line-through', 'no-underline', 'text-left', 'text-center', 'text-right', 'leading-tight', 'leading-normal', 'leading-relaxed'],
         colors: ['text-white', 'text-black', 'text-gray-100', 'text-gray-200', 'text-gray-300', 'text-gray-400', 'text-gray-500', 'text-gray-600', 'text-gray-700', 'text-gray-800', 'text-gray-900', 'text-red-500', 'text-blue-500', 'text-green-500', 'text-yellow-500', 'text-purple-500', 'text-pink-500', 'bg-white', 'bg-black', 'bg-transparent', 'bg-gray-50', 'bg-gray-100', 'bg-gray-200', 'bg-gray-800', 'bg-gray-900', 'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500'],
-        borders: ['border', 'border-0', 'border-2', 'border-4', 'border-t', 'border-r', 'border-b', 'border-l', 'rounded', 'rounded-sm', 'rounded-md', 'rounded-lg', 'rounded-xl', 'rounded-full', 'border-solid', 'border-dashed', 'border-dotted', 'border-gray-200', 'border-gray-300', 'border-gray-400', 'border-gray-600'],
+        borders: ['border', 'border-0', 'border-2', 'border-4', 'border-t', 'border-r', 'border-b', 'border-l', 'rounded', 'rounded-sm', 'rounded-lg', 'rounded-lg', 'rounded-xl', 'rounded-full', 'border-solid', 'border-dashed', 'border-dotted', 'border-gray-200', 'border-gray-300', 'border-gray-400', 'border-gray-600'],
         effects: ['shadow', 'shadow-sm', 'shadow-md', 'shadow-lg', 'shadow-xl', 'shadow-none', 'opacity-0', 'opacity-25', 'opacity-50', 'opacity-75', 'opacity-100', 'hover:shadow-lg', 'transition-all', 'duration-200', 'duration-300', 'ease-in-out'],
         positioning: ['relative', 'absolute', 'fixed', 'sticky', 'static', 'top-0', 'right-0', 'bottom-0', 'left-0', 'inset-0', 'z-10', 'z-20', 'z-30', 'z-40', 'z-50'],
         interactivity: ['cursor-pointer', 'cursor-default', 'cursor-not-allowed', 'select-none', 'select-all', 'pointer-events-none', 'hover:bg-gray-100', 'hover:bg-gray-800', 'focus:outline-none', 'focus:ring-2', 'focus:ring-blue-500']
@@ -107,7 +107,7 @@ const TailwindClassInput = ({ value = '', onChange, placeholder = 'Search Tailwi
 
     return (
         <div className="w-full">
-            {/* Selected Classes Tags */}
+            {}
             {selectedClasses.length > 0 && (
                 <div className="mb-2 p-2  rounded border border-gray-700">
                     <Space size={[4, 4]} wrap>
@@ -134,7 +134,7 @@ const TailwindClassInput = ({ value = '', onChange, placeholder = 'Search Tailwi
                 </div>
             )}
 
-            {/* Input Field */}
+            {}
             <AutoComplete
                 value={inputValue}
                 options={filteredOptions}
@@ -160,14 +160,14 @@ const TailwindClassInput = ({ value = '', onChange, placeholder = 'Search Tailwi
                 />
             </AutoComplete>
 
-            {/* Count Display */}
+            {}
             {selectedClasses.length > 0 && (
                 <div className="mt-1 text-xs text-gray-400">
                     {selectedClasses.length} class{selectedClasses.length !== 1 ? 'es' : ''} selected
                 </div>
             )}
 
-            {/* Dark mode styles for AutoComplete dropdown */}
+            {}
             <style jsx global>{`
 
       `}</style>

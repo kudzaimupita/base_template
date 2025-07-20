@@ -190,7 +190,7 @@ export const statePlugin = {
             if (process.pageId) key = process.pageId;
             key = process.pageId;
           }
-          console.log(process)
+        
           process?.store.dispatch(
             process?.setAppStatePartial({
               payload: process?.cssStyling,
@@ -1330,8 +1330,6 @@ export const statePlugin = {
             } catch (e) {
               messageData = event.data;
             }
-//  messageLogger.warning('hhhh')
-//  console.log(messageData,process?.onMessage?.plugins)
  createEventHandler(messageData,process?.onMessage, process.compId,{},navigate,paramState,process.pageId,process.editMode,process.store,process?.refreshAppAuth,
   process?.setDestroyInfo,process.setSessionInfo,process?.setAppStatePartial,()=>''
  )
@@ -1481,21 +1479,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -1686,21 +1684,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -2018,21 +2016,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -2368,21 +2366,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -2628,21 +2626,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -2874,21 +2872,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -3129,21 +3127,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -3368,21 +3366,21 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.info) {
             messageLogger.info(text);
           } else {
-            console.log('[INFO]', text);
+            
           }
         },
         success: (text) => {
           if (typeof message !== 'undefined' && messageLogger.success) {
             messageLogger.success(text);
           } else {
-            console.log('[SUCCESS]', text);
+            
           }
         },
         error: (text) => {
           if (typeof message !== 'undefined' && messageLogger.error) {
             messageLogger.error(text);
           } else {
-            console.error('[ERROR]', text);
+            
           }
         },
         warn: (text) => {
@@ -4994,7 +4992,7 @@ export const statePlugin = {
       const start = performance.now();
       const result = fn();
       const end = performance.now();
-      console.log(`${name} took ${end - start} milliseconds`);
+ 
       return result;
     },
 
@@ -5797,7 +5795,7 @@ export const statePlugin = {
             process.controller,
             process?.componentId,
             process?.viewId,
-            process?.headers
+            process?.headers,'development'
           );
           if (Object.keys(res.data.errors).length > 0) {
             // messageLogger.error(JSON.stringify(res.data.errors, null, 2));

@@ -633,7 +633,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
 
     return (
         <div className="w-full bg-neutral-950 text-neutral-300 h-screen overflow-y-auto border-l border-neutral-800">
-            {/* Header */}
+            {}
             <div className="p-3 border-b border-neutral-800">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold text-white">Properties</h2>
@@ -648,13 +648,13 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                     </button>
                 </div>
 
-                {/* Class Preview */}
+                {}
                 <div className="bg-neutral-900 rounded p-2 text-xs font-mono text-neutral-400 break-all">
                     {generateClassName() || 'No classes'}
                 </div>
             </div>
 
-            {/* State Tabs */}
+            {}
             <div className="p-3 border-b border-neutral-800">
                 <div className="flex gap-1 mb-2">
                     <StateTab
@@ -684,7 +684,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </div>
 
-            {/* Layout Section */}
+            {}
             <Section title="Layout" icon={Layout} sectionKey="layout">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -788,7 +788,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Sizing Section */}
+            {}
             <Section title="Size" icon={Monitor} sectionKey="sizing">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -842,7 +842,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Spacing Section */}
+            {}
             <Section title="Spacing" icon={Move} sectionKey="spacing">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -918,7 +918,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Typography Section */}
+            {}
             <Section title="Typography" icon={Type} sectionKey="typography">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1003,7 +1003,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Background Section */}
+            {}
             <Section title="Background" icon={Palette} sectionKey="background">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1037,7 +1037,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Effects Section */}
+            {}
             <Section title="Effects" icon={Zap} sectionKey="effects">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1075,7 +1075,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Borders Section */}
+            {}
             <Section title="Borders" icon={Smartphone} sectionKey="borders">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1102,7 +1102,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                                 { value: 'rounded-none', label: 'None' },
                                 { value: 'rounded-sm', label: 'Small' },
                                 { value: 'rounded', label: 'Default' },
-                                { value: 'rounded-md', label: 'Medium' },
+                                { value: 'rounded-lg', label: 'Medium' },
                                 { value: 'rounded-lg', label: 'Large' },
                                 { value: 'rounded-xl', label: 'Extra Large' },
                                 { value: 'rounded-2xl', label: '2XL' },
@@ -1134,7 +1134,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Transform Section */}
+            {}
             <Section title="Transform" icon={MousePointer} sectionKey="transform">
                 <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1181,7 +1181,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
                 </div>
             </Section>
 
-            {/* Custom Classes Section */}
+            {}
             <Section title="Custom Classes" icon={Plus} sectionKey="custom">
                 <div className="grid grid-cols-2 gap-2">
                     <div className="flex gap-1">
