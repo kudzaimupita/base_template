@@ -332,7 +332,6 @@ export const statePlugin = {
           ? JSON.parse(process.stateConfig) 
           : (process.stateConfig || {});
       } catch (e) {
-        console.error('Failed to parse stateConfig:', e);
         config = {};
       }
       
@@ -413,7 +412,6 @@ export const statePlugin = {
         try {
           return JSON.parse(str);
         } catch (e) {
-          console.warn('JSON parse error:', e.message, 'Input:', str);
           return fallback;
         }
       };
@@ -1097,7 +1095,6 @@ export const statePlugin = {
               ...res.data,
             };
         } catch (error) {
-          console.error(error)
           // messageLogger.error('err ');
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {

@@ -74,7 +74,7 @@ export const companySlice = createSlice({
         state.savedLayout = savedLayout;
       })
       .addCase(fetchAppPersist.rejected, (state, action) => {
-        console.error('Error fetching application:', action.payload);
+        // Error handled by the action payload
       });
   },
 });

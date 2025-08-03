@@ -91,7 +91,7 @@ export const applicationSlice = createSlice({
           }),
         };
       } else {
-        console.error('Invalid state structure:', state);
+        // Invalid state structure
       }
     },
     updateCurrentAppViewStyle: (state, action) => {
@@ -120,7 +120,7 @@ export const applicationSlice = createSlice({
           }),
         };
       } else {
-        console.error('Invalid state structure:', state);
+        // Invalid state structure
       }
     },
     // setCurrentView: (state, action) => {
@@ -138,7 +138,7 @@ export const applicationSlice = createSlice({
         state.savedLayout = savedLayout;
       })
       .addCase(fetchApp.rejected, (state, action) => {
-        console.error('Error fetching application:', action.payload);
+        // Error handled by the action payload
       });
   },
 });

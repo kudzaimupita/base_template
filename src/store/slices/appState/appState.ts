@@ -121,9 +121,6 @@ const appStateSlice = createSlice({
       const { key, payload, operationType = 'set', operationConfig = {} } = action.payload;
      
       if (!key) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('setAppStatePartial: key is required');
-        }
         return;
       }
 
@@ -330,7 +327,6 @@ const appStateSlice = createSlice({
                 const configValue = get(elementContext.elementConfiguration, path);
                 if (typeof configValue === 'string') {
                   targetString = configValue;
-                  console.log('Found targetString via elementConfiguration path:', path, '=', configValue);
                   break;
                 }
               }
@@ -340,29 +336,14 @@ const appStateSlice = createSlice({
             if (!targetString) {
               if (typeof currentValue === 'string') {
                 targetString = currentValue;
-                console.log('Using currentValue as targetString:', currentValue);
               } else {
                 const stateValue = get(state, key);
                 targetString = typeof stateValue === 'string' ? stateValue : '';
-                console.log('Using state value as targetString:', stateValue);
               }
             }
             
-            console.log('StringRemove Debug (using store.getState()):', {
-              key,
-              targetString,
-              removeStr,
-              currentValue,
-              elementContext: !!elementContext,
-              elementId: elementContext?.elementId,
-              viewId: elementContext?.viewId,
-              hasElementConfig: !!elementContext?.elementConfiguration,
-              elementConfigKeys: elementContext?.elementConfiguration ? Object.keys(elementContext.elementConfiguration) : 'none'
-            });
-            
             // Skip if nothing to remove or no target string
             if (!removeStr?.trim() || !targetString?.trim()) {
-              console.log('StringRemove: Skipping - no removeStr or targetString');
               break;
             }
             
@@ -378,12 +359,6 @@ const appStateSlice = createSlice({
             });
             
             finalPayload = parts.join(separator).replace(/\s+/g, ' ').trim();
-            
-            console.log('StringRemove Result:', {
-              before: targetString,
-              after: finalPayload,
-              removed: removeValues
-            });
             
             safeSet(state, key, finalPayload);
             break;
@@ -446,17 +421,10 @@ const appStateSlice = createSlice({
           }
         }
 
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`State operation '${operationType}' completed for key: ${key}`, { 
-            previousValue: currentValue, 
-            newValue: finalPayload 
-          });
-        }
+        // State operation completed
 
                } catch (error: any) {
-           if (process.env.NODE_ENV !== 'production') {
-             console.error(`State operation '${operationType}' failed for key: ${key}`, error);
-           }
+           // State operation failed
          }
     },
 

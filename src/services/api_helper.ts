@@ -22,7 +22,7 @@ axiosApi.interceptors.request.use(
     try {
       // persistData = rawPersistData ? JSON.parse(rawPersistData) : {};
     } catch (e) {
-      console.warn('Failed to parse persist data:', e);
+      // Failed to parse persist data
     }
 
     return config;
