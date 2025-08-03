@@ -1,3 +1,5 @@
+/* eslint-disable react/display-name */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useMemo, useRef, useState, createContext, useContext, useCallback } from 'react';
 
 import ErrorBoundary from './ErrorBoundary';
@@ -13,6 +15,26 @@ import { useParams } from 'react-router-dom';
 import { convertParentViewToLayoutItem, createEventHandlers, extractValue, processObjectTemplatesAndReplace, renderComponent, SELF_CLOSING_TAGS, syncParentChildRelationships } from './utils';
 import { message } from 'antd';
 import { SortableContainerSetup } from './Setup';
+
+// Global state to track sortable operations and prevent conflicts
+let isSortableOperationActive = false;
+let sortableOperationTimeouts = new Set<NodeJS.Timeout>();
+
+const setSortableOperationState = (active: boolean) => {
+  isSortableOperationActive = active;
+  if (!active) {
+    // Clear any pending timeouts when operation completes
+    sortableOperationTimeouts.forEach(timeout => clearTimeout(timeout));
+    sortableOperationTimeouts.clear();
+  }
+};
+
+// Helper function to check if sortable is active using DOM state as fallback
+const isSortableCurrentlyActive = () => {
+  return isSortableOperationActive || 
+         document.body.classList.contains('sortable-dragging') || 
+         document.querySelector('.sortable-ghost') !== null;
+};
 
 const ElementRendererContext = createContext(null);
 
@@ -89,6 +111,22 @@ const ElementItem = React.memo(({
     setItemToEdit,
   } = context;
 
+  // State for tracking overrides refresh
+  const [overridesRefreshKey, setOverridesRefreshKey] = useState(0);
+
+  // Listen for element overrides updates
+  useEffect(() => {
+    const handleOverridesUpdate = (event) => {
+      const { elementId, viewId } = event.detail;
+      if (elementId === oldItem?.i && viewId === tab) {
+        setOverridesRefreshKey(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('elementOverridesUpdated', handleOverridesUpdate);
+    return () => window.removeEventListener('elementOverridesUpdated', handleOverridesUpdate);
+  }, [oldItem?.i, tab]);
+
   // Use cached processed item or create new one
   const item = useMemo(() => {
     if (elementCache.has(oldItem)) {
@@ -103,27 +141,33 @@ const ElementItem = React.memo(({
   const hasInitialized = useRef(false);
   const initializationKey = useRef(null);
 
-  // Optimize children management with batching
+  // Optimize children management with batching - avoid conflicts with SortableJS
   const ensureChildrenInGlobalElements = useCallback((childElements) => {
     if (!childElements || childElements.length === 0) return;
     
-    // Use requestAnimationFrame to batch updates
-    requestAnimationFrame(() => {
-      setElements(currentElements => {
-        const elementsMap = new Map(currentElements.map(el => [el.i, el]));
-        let hasChanges = false;
+    // Check if we're in the middle of a sortable operation to avoid conflicts
+    if (isSortableCurrentlyActive()) {
+      // Defer until sortable operation is complete
+      const timeout = setTimeout(() => ensureChildrenInGlobalElements(childElements), 200);
+      sortableOperationTimeouts.add(timeout);
+      return;
+    }
+    
+    // Use a more conservative approach without requestAnimationFrame to avoid timing conflicts
+    setElements(currentElements => {
+      const elementsMap = new Map(currentElements.map(el => [el.i, el]));
+      let hasChanges = false;
 
-        const newElements = childElements.filter(childEl => {
-          if (childEl && childEl.i && !elementsMap.has(childEl.i)) {
-            elementsMap.set(childEl.i, childEl);
-            hasChanges = true;
-            return true;
-          }
-          return false;
-        });
-
-        return hasChanges ? Array.from(elementsMap.values()) : currentElements;
+      const newElements = childElements.filter(childEl => {
+        if (childEl && childEl.i && !elementsMap.has(childEl.i)) {
+          elementsMap.set(childEl.i, childEl);
+          hasChanges = true;
+          return true;
+        }
+        return false;
       });
+
+      return hasChanges ? Array.from(elementsMap.values()) : currentElements;
     });
   }, [setElements]);
 
@@ -174,16 +218,7 @@ const ElementItem = React.memo(({
       })
     );
 
-    // Log only rejected promises
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error(`Error processing ${eventType} override:`, {
-          key: validOverrides[index],
-          error: result.reason,
-          item: item?.i
-        });
-      }
-    });
+    // Handle rejected promises silently
   }, [
     currentApplication?._id,
     navigate,
@@ -251,6 +286,9 @@ const ElementItem = React.memo(({
     currentApplication?._id,
     readOnly,
     processOverrides,
+    item?.configuration?._overrides_,
+    JSON.stringify(item?.configuration?._overrides_),
+    overridesRefreshKey,
 
   ]);
 
@@ -381,7 +419,10 @@ const ElementItem = React.memo(({
     refreshAppAuth,
     setDestroyInfo,
     setAppStatePartial,
-    storeInvocation
+    storeInvocation,
+    item?.configuration?._overrides_,
+    JSON.stringify(item?.configuration?._overrides_),
+    overridesRefreshKey
   ]);
 
   // Optimize cursor class generation
@@ -397,13 +438,16 @@ const ElementItem = React.memo(({
   }, [builderCursorMode, editMode, isDrawingPathActive, isLayout]);
 
   const renderItemWithData = useCallback(() => {
-    const viewTag = item?.configuration?.tag || 'div';
+    const viewTag = item.componentId === 'text' ? 'p' : (item?.configuration?.tag || 'div');
     
     const baseProps = {
       key: item.i || index,
       id: item.i || index,
-      onMouseEnter: editMode && !readOnly ? () => setisHovered(true) : undefined,
-      onMouseLeave: editMode && !readOnly ? () => setisHovered(false) : undefined,
+      'data-id': item.i || index, // For sortable detection
+      ...(item.componentId === 'text' || item.componentId === 'container' || item.componentId === 'icon' 
+        ? { id: item.i || index } 
+        : {}),   // onMouseEnter: editMode && !readOnly ? () => setisHovered(true) : undefined,
+      // onMouseLeave: editMode && !readOnly ? () => setisHovered(false) : undefined,
       onClick: (e) => {
         e.stopPropagation();
         if (item.componentId === 'drawpath' && isDrawingPathActive) {
@@ -431,7 +475,6 @@ const ElementItem = React.memo(({
           ...baseProps,
           ...itemConfiguration,
           ...flattenStyleObject(item?.configuration, item?.style?.transform, editMode),
-          ...baseProps.events,
           ...eventHandlers,
           ...stateConfig
         },
@@ -439,6 +482,7 @@ const ElementItem = React.memo(({
         editMode,
   
       ),
+      ...eventHandlers,
     }, {
       event: {},
       globalObj: {},
@@ -452,13 +496,12 @@ const ElementItem = React.memo(({
         props.type = 'button';
       }
     }
-
     delete props.style.position;
     delete props.style.transform;
-
     // Optimize children rendering
     const children = useMemo(() => {
-      if (item?.isGroup || item.componentId === 'container') {
+      // Built-in containers (container, slot) - just render children directly
+      if ((item?.isGroup && item.componentId === 'container') || item.componentId === 'slot') {
         return (
           <ElementRenderer
             allElements={allElements}
@@ -469,6 +512,17 @@ const ElementItem = React.memo(({
         );
       }
       
+      if (item.componentId === 'text') {
+        return  props.text || '';
+      }
+      
+      // Check if any element has text content in configuration (for anchor tags, buttons, etc.)
+      if (item.configuration?.text && 
+          (item.componentId === 'container' || item.configuration?.tag)) {
+        return item.configuration.text;
+      }
+      
+      // For all other components (including 3rd party containers), use renderComponent
       return renderComponent(item.componentId, {
         ...processObjectTemplatesAndReplace({ ...item }, {
           event: {},
@@ -487,10 +541,66 @@ const ElementItem = React.memo(({
         allComponentsRaw,
         processedStyle,
         renderChildren: (el) => {
-          const childEls = item?.children?.map((str) => {
-            return allElements?.find((ele) => ele.i === str);
-          }).filter(Boolean);
-
+          let childEls = [];
+          if(el){
+            // el is a string array of IDs, find the actual elements
+            childEls = el.map((str) => {
+              
+              if (typeof str === 'string') {
+                return allElements?.find((ele) => ele.i === str) 
+              }
+              return str;
+            }).filter(Boolean);
+          }else{
+            // Check if this component has componentRef properties in its schema
+            const componentId = item?.meta?.componentId;
+            if (componentId && allComponentsRaw) {
+              const component = allComponentsRaw.find(comp => comp._id === componentId || comp.id === componentId);
+              
+              if (component && component.props) {
+                try {
+                  const schema = JSON.parse(component.props);
+                  const properties = schema?.schema?.properties || {};
+                  
+                  // Find properties with config.uiType === "componentRef" and collect their values
+                  const componentRefIds = [];
+                  Object.keys(properties).forEach(key => {
+                    const property = properties[key];
+                    if (property?.config?.uiType === "componentRef") {
+                      const value = item?.props?.[key];
+                      if (value !== undefined) {
+                        if (Array.isArray(value)) {
+                          componentRefIds.push(...value);
+                        } else {
+                          componentRefIds.push(value);
+                        }
+                      }
+                    }
+                  });
+                  
+                  // Find the actual elements from the collected IDs
+                  if (componentRefIds.length > 0) {
+                    childEls = componentRefIds.map((str) => {
+                      if (typeof str === 'string') {
+                        return allElements?.find((ele) => ele.i === str);
+                      }
+                      return str;
+                    }).filter(Boolean);
+                  }
+                } catch (error) {
+                  
+                }
+              }
+            }
+            
+            // Fallback to original children logic if no componentRef found
+            if (childEls.length === 0) {
+              childEls = item?.children?.map((str) => {
+                return allElements?.find((ele) => ele.i === str);
+              }).filter(Boolean) || [];
+            }
+          }
+    
           if (childEls.length > 0) {
             ensureChildrenInGlobalElements(childEls);
           }
@@ -505,12 +615,13 @@ const ElementItem = React.memo(({
           );
         },
          configuration:{...item.configuration, ...appState?.[item.i] || {}},
-      }, componentsMap, editMode, allElements, setElements);
+      }, componentsMap, editMode, allElements, setElements, setItemToEdit);
     }, [
       item?.isGroup,
       item.componentId,
       item.i,
       item?.children,
+      item.configuration?.text,
       allElements,
       renderingStack,
       activeDrawingPathId,
@@ -548,18 +659,18 @@ const ElementItem = React.memo(({
 
       const elementss = currentApplication?.views?.find((it) => it.id === item.componentId);
 
-      if (!elementss) {
-        return (
-          <div
-            className="border-2 border-yellow-500 border-dashed p-4 bg-yellow-50"
-            style={processedStyle}
-          >
-            <p className="text-yellow-600 text-sm">
-              ⚠️ Component not found: {item.componentId}
-            </p>
-          </div>
-        );
-      }
+      // if (!elementss) {
+      //   return (
+      //     <div
+      //       className="border-2 border-yellow-500 border-dashed p-4 bg-yellow-50"
+      //       style={processedStyle}
+      //     >
+      //       <p className="text-yellow-600 text-sm">
+      //         ⚠️ Component not found: {item.componentId}
+      //       </p>
+      //     </div>
+      //   );
+      // }
 
    
       const viewElements = syncParentChildRelationships([...convertParentViewToLayoutItem(elementss, item.i)]) || [];
@@ -670,13 +781,12 @@ const ElementRenderer = React.memo(({
   const [currentTab, setCurrentTab] = useState(tab);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Optimize tab change with better batching
+  // Optimize tab change with better batching - avoid conflicts with SortableJS
   useEffect(() => {
     if (currentTab !== tab && isWrapper) {
       setIsClearing(true);
-
-      // Use requestAnimationFrame for better performance
-      requestAnimationFrame(() => {
+      
+      const performTabChange = () => {
         setElements(currentElements => {
           const filteredElements = currentElements.filter(el => {
             if (el.tab && el.tab !== tab) return false;
@@ -690,7 +800,16 @@ const ElementRenderer = React.memo(({
 
         setCurrentTab(tab);
         setIsClearing(false);
-      });
+      };
+
+      if (isSortableCurrentlyActive()) {
+        // Defer until sortable operation is complete
+        const timeout = setTimeout(performTabChange, 300);
+        sortableOperationTimeouts.add(timeout);
+      } else {
+        // Small delay to ensure DOM stability
+        setTimeout(performTabChange, 50);
+      }
     }
   }, [tab, currentTab, isWrapper, setElements]);
 
@@ -767,10 +886,11 @@ interface ElementRendererWithContextProps {
   parentId?: string | null;
   isWrapper?: boolean;
   tab?: string;
+  editMode?: boolean;
 }
 
 const ElementRendererWithContext = React.memo((props: ElementRendererWithContextProps) => {
-  // Use Map for better performance with large element lists
+  // Use Map for better performance with large element lists and sort by hierarchy
   const cleanedElements = useMemo(() => {
     if (!props.elements || !Array.isArray(props.elements)) {
       return [];
@@ -794,7 +914,53 @@ const ElementRendererWithContext = React.memo((props: ElementRendererWithContext
       }
     }
 
-    return Array.from(cleanedMap.values());
+    const elementsArray = Array.from(cleanedMap.values());
+    
+    // Sort elements hierarchically based on children arrays
+    const sortElementsHierarchically = (elements) => {
+      const elementMap = new Map(elements.map(el => [el.i, el]));
+      const sortedElements = [];
+      const processed = new Set();
+
+      // Helper function to traverse depth-first
+      const traverseDepthFirst = (elementId) => {
+        if (processed.has(elementId) || !elementMap.has(elementId)) {
+          return;
+        }
+
+        processed.add(elementId);
+        const element = elementMap.get(elementId);
+        sortedElements.push(element);
+
+        // Process children in the order specified by the children array
+        if ((element as any).children && Array.isArray((element as any).children)) {
+          (element as any).children.forEach((childId: string) => {
+            if (elementMap.has(childId)) {
+              traverseDepthFirst(childId);
+            }
+          });
+        }
+      };
+
+      // Start with root elements (those with no parent or parent is null)
+      const rootElements = elements.filter(el => !el.parent || el.parent === null);
+      
+      // Process each root element and its descendants
+      rootElements.forEach(rootElement => {
+        traverseDepthFirst(rootElement.i);
+      });
+
+      // Add any remaining unprocessed elements (orphaned elements)
+      elements.forEach(element => {
+        if (!processed.has(element.i)) {
+          sortedElements.push(element);
+        }
+      });
+
+      return sortedElements;
+    };
+
+    return sortElementsHierarchically(elementsArray);
   }, [props.elements, props.tab]);
 
   // Deep memo for context value to prevent unnecessary re-renders
@@ -806,7 +972,14 @@ const ElementRendererWithContext = React.memo((props: ElementRendererWithContext
 
   return (
     <ElementRendererContext.Provider value={contextValue}>
-    {props.editMode && <SortableContainerSetup elementss={cleanedElements} setElements={props.setElements} />}  
+    {props.editMode && (
+      <SortableContainerSetup
+        elementss={cleanedElements} 
+        setElements={props.setElements}
+        setSortableOperationState={setSortableOperationState}
+        isSortableCurrentlyActive={isSortableCurrentlyActive}
+      />
+    )}  
       <ElementRenderer
         allElements={cleanedElements}
         parentId={props.parentId}

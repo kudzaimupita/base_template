@@ -63,7 +63,7 @@ const dragAndDropSlice = createSlice({
             state.isItemMedia = isItemMedia ?? null;
             state.mediaType = mediaType ?? null;
             state.mediaExtension = mediaExtension ?? null;
-            console.log("weedth: " + width)
+      
         },
         resetDragAndDrop() {
             return initialState;

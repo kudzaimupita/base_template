@@ -241,12 +241,17 @@ function containsHarmfulCode(code) {
   return false;
 }
 function deepParse(input, req = {}, controllers = {}, sessionInfo) {
+  // Handle non-string inputs early
+  if (typeof input !== 'string') {
+    return input;
+  }
+
   if (isStringifiedFunction(input)) {
     if (containsHarmfulCode(input)) {
       return input;
     } else {
       let parsedFunction;
-      const result = parsedFunction(sessionInfo, state);
+      const result = parsedFunction(sessionInfo, req);
       return result;
     }
   }
@@ -255,29 +260,46 @@ function deepParse(input, req = {}, controllers = {}, sessionInfo) {
     if (typeof jsonObject === 'object' && jsonObject !== null) {
       for (const key in jsonObject) {
         if (typeof jsonObject[key] === 'string') {
-          jsonObject[key] = deepParse(jsonObject[key], controllers);
+          jsonObject[key] = deepParse(jsonObject[key], req, controllers, sessionInfo);
         }
       }
       return jsonObject;
     }
-  } catch (error) { }
+  } catch (error) {
+    // Ignore JSON parse errors
+  }
   if (input === 'true' || input === 'false') {
     return input === 'true';
   }
-  if (!isNaN(input)) {
+  if (!isNaN(Number(input)) && input.trim() !== '') {
     return parseFloat(input);
   }
-  if (input?.startsWith('[') && input?.endsWith(']')) {
+  if (input.startsWith('[') && input.endsWith(']')) {
     try {
       const array = JSON.parse(input);
       if (Array.isArray(array)) {
-        return array.map((item) => deepParse(item), controllers);
+        return array.map((item) => deepParse(item, req, controllers, sessionInfo));
       }
-    } catch (error) { }
+    } catch (error) {
+      // Ignore JSON parse errors
+    }
   }
   return input;
 }
 function secureInterpolate(template, sources) {
+  // Handle case where template is an object - stringify it first if it's a plain object
+  if (template && typeof template === 'object' && !Array.isArray(template)) {
+    // If it's a plain object with string values that contain template patterns, process it directly
+    // Otherwise, stringify it first
+    const hasTemplatePatterns = Object.values(template).some(value => 
+      typeof value === 'string' && value.includes('{{') && value.includes('}}')
+    );
+    
+    if (!hasTemplatePatterns) {
+      template = JSON.stringify(template);
+    }
+  }
+
   const predefinedSources = {
     date: {
       now: () => new Date().toISOString(),
@@ -359,7 +381,8 @@ function secureInterpolate(template, sources) {
       isDate: (value) => value instanceof Date,
       isFunction: (value) => typeof value === 'function',
     },
-    ...sources, // Merge with any additional sources provided
+    // Merge with any additional sources provided
+    ...sources,
   };
 
   function getValue(path, context = predefinedSources) {
@@ -458,7 +481,7 @@ function secureInterpolate(template, sources) {
       // Parse the selected value
       return parseLiteral(selectedValue) || selectedValue;
     } catch (error) {
-      console.error('Error parsing ternary:', error);
+      
       return '';
     }
   }
@@ -475,7 +498,7 @@ function secureInterpolate(template, sources) {
       const trimmedKey = fullPlaceholderMatch[1].trim();
 
       // First, try to parse as a literal
-      let parsedValue = parseLiteral(trimmedKey);
+      const parsedValue = parseLiteral(trimmedKey);
       if (parsedValue !== undefined) {
         return parsedValue;
       }
@@ -503,7 +526,7 @@ function secureInterpolate(template, sources) {
         try {
           return evaluateLogical(trimmedKey, predefinedSources);
         } catch (err) {
-          console.error('Error evaluating expression:', err);
+          
           return '';
         }
       }
@@ -524,7 +547,7 @@ function secureInterpolate(template, sources) {
       iterations++;
 
       if (iterations > maxIterations) {
-        console.warn('Maximum interpolation iterations reached');
+        
         break;
       }
 
@@ -532,7 +555,7 @@ function secureInterpolate(template, sources) {
         const trimmedKey = key.trim();
 
         // First, try to parse as a literal
-        let parsedValue = parseLiteral(trimmedKey);
+        const parsedValue = parseLiteral(trimmedKey);
         if (parsedValue !== undefined) {
           hasPlaceholders = true;
           return typeof parsedValue === 'object' ? JSON.stringify(parsedValue) : String(parsedValue);
@@ -564,7 +587,7 @@ function secureInterpolate(template, sources) {
             hasPlaceholders = true;
             return String(result);
           } catch (err) {
-            console.error('Error evaluating expression:', err);
+            
             return '';
           }
         }
@@ -643,7 +666,8 @@ function secureInterpolate(template, sources) {
         Object.entries(value).map(([key, val]) => [key, parseValue(val)])
       );
     }
-    return value; // Return primitives as-is
+    // Return primitives as-is
+    return value;
   }
 
   return parseValue(template);
@@ -681,7 +705,7 @@ export const getUrlDetails = (paramss = {}) => {
         .then((response) => response.json())
         .then((data) => resolve(data.ip))
         .catch((error) => {
-          console.warn('Could not retrieve public IP:', error);
+          
           resolve(null);
         });
     });
@@ -721,7 +745,7 @@ export const getUrlDetails = (paramss = {}) => {
       port: window.location.port,
       searchParams: Object.fromEntries(new URLSearchParams(window.location.search).entries()),
       params: (() => {
-        const paramsCopy = { ...paramss };
+        const paramsCopy = { ...paramss } as any;
         delete paramsCopy?.id;
         delete paramsCopy?.tab;
         delete paramsCopy?.setting;
@@ -792,18 +816,18 @@ export const getUrlDetails = (paramss = {}) => {
       timeOrigin: window.performance.timeOrigin,
       timing: window.performance.timing,
       navigation: window.performance.navigation,
-      memory: window.performance.memory || null,
+      memory: (window.performance as any).memory || null,
     },
 
     // Network Information
     network: {
       // ipAddress: getPublicIP(),
-      connection: navigator.connection
+      connection: (navigator as any).connection
         ? {
-          type: navigator.connection.type,
-          effectiveType: navigator.connection.effectiveType,
-          downlinkMax: navigator.connection.downlinkMax,
-          saveData: navigator.connection.saveData,
+          type: (navigator as any).connection.type,
+          effectiveType: (navigator as any).connection.effectiveType,
+          downlinkMax: (navigator as any).connection.downlinkMax,
+          saveData: (navigator as any).connection.saveData,
         }
         : null,
 
@@ -918,7 +942,7 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
       const storedValue = localStorage.getItem(key || '');
       localStore = storedValue ? JSON.parse(storedValue) : {};
     } catch (error) {
-      console.error('Error parsing localStorage item:', error);
+      
       localStore = {};
     }
 
@@ -948,11 +972,14 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
       if (prefix === 'tagKeys' || prefix === 'antComponentKeys') {
         const parts = cleanPath.split('.');
         if (parts.length >= 3) {
-          return parts[2]; // Return the third part (index 2)
+          // Return the third part (index 2)
+          return parts[2];
         } else if (parts.length === 2) {
-          return parts[1]; // Return the second part if only two exist
+          // Return the second part if only two exist
+          return parts[1];
         } else {
-          return cleanPath; // Return as is if not enough parts
+          // Return as is if not enough parts
+          return cleanPath;
         }
       }
 

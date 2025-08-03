@@ -251,7 +251,7 @@ if (process.editMode === true && Array.isArray(list)) {
   messageLogger.warn('List capped at 25 items on editMode')
 }
 
-const data = list;
+const data = Array.from(list);
 
     
     if (!_.isArray(data)) {
@@ -321,7 +321,7 @@ const data = list;
           return getValueByPath(result?.data, process.name);
           
         } catch (error) {
-          console.error(`Error processing item at index ${index}:`, error);
+          
           
           if (process.terminateOnError) {
             throw error;
@@ -368,7 +368,7 @@ const data = list;
         duration: `${duration.toFixed(2)}ms`
       });
       
-      console.error('Error executing optimized loop:', error);
+      
       globalErrors[process.name] = error.message || error;
     }
   },

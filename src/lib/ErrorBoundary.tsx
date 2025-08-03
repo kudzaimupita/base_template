@@ -87,7 +87,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
         });
         
       } catch (recoveryError) {
-        console.error('❌ Recovery failed:', recoveryError);
+        
         this.setState({ autoRecovering: false });
       }
     }, 500); // Give DOM time to settle
@@ -101,7 +101,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
         try {
           el.remove();
         } catch (e) {
-          console.warn('Could not remove orphaned element:', e);
+          
         }
       });
 
@@ -111,7 +111,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
       
       elementsWithIds.forEach(element => {
         if (element.id && seenIds.has(element.id)) {
-          console.warn('🧹 Cleaning up duplicate ID during recovery:', element.id);
+          
           try {
             // Mark for removal instead of removing immediately
             element.setAttribute('data-sortable-orphan', 'true');
@@ -122,11 +122,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
                   element.remove();
                 }
               } catch (e) {
-                console.warn('Could not remove duplicate element:', e);
+                
               }
             }, 0);
           } catch (e) {
-            console.warn('Error marking duplicate for removal:', e);
+            
           }
         } else if (element.id) {
           seenIds.add(element.id);
@@ -139,7 +139,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
       }
 
     } catch (cleanupError) {
-      console.warn('Error during DOM cleanup:', cleanupError);
+      
     }
   };
 

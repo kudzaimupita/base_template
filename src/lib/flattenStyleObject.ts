@@ -19,12 +19,15 @@ export const flattenStyleObject = (obj = {}, transform = '', editMode = false) =
   // 3. Process background image
   processBackgroundImage(cleanedObj);
 
-  // 4. Process transform and ensure proper transition
+  // 4. Process CSS variables (custom properties)
+  processCSSVariables(cleanedObj);
+
+  // 5. Process transform and ensure proper transition
   if (transform) {
     processTransform(cleanedObj, transform);
   }
 
-  // 5. Handle pointer events based on edit mode
+  // 6. Handle pointer events based on edit mode
   // if (editMode) {
   //   cleanedObj.pointerEvents = "none";
   // }
@@ -55,6 +58,27 @@ const processBackgroundProperties = (obj) => {
   if (obj?.backgroundType === 'image') {
     delete obj.backgroundColor;
     delete obj.background;
+  }
+};
+
+/**
+ * Process CSS variables (custom properties) from cssVariables object
+ * @param {Object} obj - The style object to process
+ */
+const processCSSVariables = (obj) => {
+  if (obj.cssVariables && typeof obj.cssVariables === 'object') {
+    // Add CSS variables as custom properties to the style object
+    Object.entries(obj.cssVariables).forEach(([key, value]) => {
+      // Skip internal properties that start with underscore
+      if (key.startsWith('_')) {
+        return;
+      }
+      if (key.startsWith('--') && value !== undefined && value !== null && value !== '') {
+        obj[key] = value;
+      }
+    });
+    // Remove the cssVariables object as it's been processed
+    delete obj.cssVariables;
   }
 };
 

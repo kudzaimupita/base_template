@@ -41,7 +41,7 @@ const sessionSlice = createSlice({
         [key]: action.payload?.data,
         // ...action.payload?.data,
       };
-      console.log(updatedData);
+   
 
       // Update localStorage with the new merged data
       localStorage.setItem(action.payload?.id, JSON.stringify(updatedData));

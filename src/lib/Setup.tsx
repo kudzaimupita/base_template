@@ -1,7 +1,21 @@
+import { message } from 'antd';
 import { useEffect, useRef } from 'react';
 import Sortable from 'sortablejs';
 
-export const SortableContainerSetup = ({ elementss, setElements }) => {
+// Interface for component props
+interface SortableContainerSetupProps {
+  elementss: any[];
+  setElements: (elements: any[] | ((currentElements: any[]) => any[])) => void;
+  setSortableOperationState?: (active: boolean) => void;
+  isSortableCurrentlyActive?: () => boolean;
+}
+
+export const SortableContainerSetup = ({ 
+  elementss, 
+  setElements, 
+  setSortableOperationState,
+  isSortableCurrentlyActive 
+}: SortableContainerSetupProps) => {
     const sortableInstances = useRef([]);
     const isProcessingUpdate = useRef(false);
 
@@ -9,21 +23,22 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
     const removeDuplicateElements = () => {
         try {
             const seenIds = new Set();
-            const cubeElements = document.querySelectorAll('.cube [id]');
-            
+            const cubeElements = document.querySelectorAll('.cube[id]');
+    
             cubeElements.forEach(element => {
-                if (element.id && seenIds.has(element.id)) {
+                const elementId = element.id;
+                if (seenIds.has(elementId)) {
                     try {
                         element.remove();
                     } catch (removeError) {
-                        console.warn('Failed to remove duplicate:', removeError);
+                        // Failed to remove duplicate element
                     }
-                } else if (element.id) {
-                    seenIds.add(element.id);
+                } else {
+                    seenIds.add(elementId);
                 }
             });
         } catch (error) {
-            console.warn('Error in removeDuplicateElements:', error);
+            // Error in removeDuplicateElements
         }
     };
 
@@ -36,7 +51,7 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                         instance.destroy();
                     }
                 } catch (destroyError) {
-                    console.warn('Error destroying sortable instance:', destroyError);
+                    // Error destroying sortable instance
                 }
             });
             sortableInstances.current = [];
@@ -44,15 +59,40 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
             // Remove any duplicate elements before setup
             removeDuplicateElements();
 
-            const containers = document.querySelectorAll('.cube');
+            // Simple approach: find all potential containers
+            const containers = [];
+            
+            // Add root container
+            const rootContainer = document.getElementById('servly-builder-container');
+            if (rootContainer) {
+                containers.push(rootContainer);
+            }
+            
+            // Find all elements that currently contain .cube children
+            document.querySelectorAll('*').forEach(element => {
+                const directCubeChildren = element.querySelectorAll(':scope > .cube');
+                if (directCubeChildren.length > 0 && !containers.includes(element)) {
+                    containers.push(element);
+                }
+            });
+            
+            // Also add all group elements for future drops
+            const containerElements = elementss?.filter(el => el.isGroup) || [];
+            containerElements.forEach(el => {
+                const elementDOM = document.getElementById(el.i);
+                if (elementDOM && !containers.includes(elementDOM)) {
+                    containers.push(elementDOM);
+                }
+            });
             
             containers.forEach((container) => {
                 try {
                     // Remove the data attribute to ensure fresh initialization
                     container.removeAttribute('data-sortable-init');
                     
-                    const sortableInstance = Sortable.create(container, {
+                    const sortableInstance = Sortable.create(container as HTMLElement, {
                         group: { name: 'sortable-list-2', pull: true, put: true },
+                        draggable: '.cube', // Only .cube elements within the container are draggable
                         animation: 150,
                         ghostClass: 'sortable-ghost',
                         chosenClass: 'sortable-chosen',
@@ -61,29 +101,56 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                         fallbackTolerance: 3,
                         scroll: false,
                         bubbleScroll: false,
+                        filter: '.virtual .noDrag, [data-virtual="true"], [data-slot="true"]', // Filter out virtual elements and slots
+                        swapThreshold: 1,
+                        emptyInsertThreshold: 5,
                         
                         onStart: (evt) => {
                             try {
+                                const draggedElement = evt.item;
+                                const elementId = draggedElement?.id;
+                                const element = elementss?.find(el => el.i === elementId);
+                                
+                                // Block external elements completely (from component library)
+                                // Check if element exists in our elements array by ID
+                                if (!element || !elementId) {
+                                    return false;
+                                }
+                                
+                                // Block virtual elements and slots
+                                if (element?.isVirtual || element?.componentId === 'slot') {
+                                    return false;
+                                }
+                                
+                                // Set global state to prevent React conflicts
+                                setSortableOperationState?.(true);
                                 document.body.classList.add('sortable-dragging');
                             } catch (error) {
-                                console.warn('Error in onStart:', error);
+                                setSortableOperationState?.(false);
+                                return false;
                             }
                         },
+
+                        // Note: onAdd is intentionally not implemented here
+                        // New components from the library are handled by the existing drop system
+                        // This sortable only handles reordering existing elements
                         
                         onEnd: (evt) => {
+                            // return
                             try {
                                 document.body.classList.remove('sortable-dragging');
                                 
                                 // Prevent multiple simultaneous updates
                                 if (isProcessingUpdate.current) {
+                                    setSortableOperationState?.(false);
                                     return;
                                 }
                                 isProcessingUpdate.current = true;
                                 
                                 const { item, to, from, newIndex, oldIndex } = evt || {};
-                                
+                              
                                 if (!item || !item.id) {
-                                    console.warn('❌ Invalid drag item');
+                                    message.success('❌ Invalid drag item');
                                     isProcessingUpdate.current = false;
                                     return;
                                 }
@@ -91,7 +158,20 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                 const movedId = item.id;
                                 const newParentId = to?.getAttribute?.('data-id') || to?.id || null;
                                 const oldParentId = from?.getAttribute?.('data-id') || from?.id || null;
+
+                                // Block external elements completely (from component library)
+                                const movedElement = elementss?.find(el => el.i === movedId);
+                                if (!movedElement) {
+                                    isProcessingUpdate.current = false;
+                                    return;
+                                }
                                 
+                                // Block virtual elements and slots
+                                if (movedElement?.isVirtual || movedElement?.componentId === 'slot') {
+                                    isProcessingUpdate.current = false;
+                                    return;
+                                }
+
                                 // Check if it's the same container and same position
                                 if (to === from && newIndex === oldIndex) {
                                     isProcessingUpdate.current = false;
@@ -102,7 +182,7 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                 const captureContainerState = (container) => {
                                     if (!container || !container.children) return [];
                                     return Array.from(container.children)
-                                        .map(child => child?.id)
+                                        .map(child => (child as HTMLElement)?.id)
                                         .filter(id => id && id !== '' && typeof id === 'string');
                                 };
                                 
@@ -111,7 +191,6 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                 
                                 // Validate that our moved element is in the new container
                                 if (!newParentChildren.includes(movedId)) {
-                                    console.warn('❌ Moved element not found in new parent DOM children');
                                     isProcessingUpdate.current = false;
                                     return;
                                 }
@@ -120,18 +199,27 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                 setTimeout(() => {
                                     try {
                                         if (setElements && typeof setElements === 'function') {
-                                            
                                             setElements(currentElements => {
                                                 try {
                                                     if (!Array.isArray(currentElements)) {
-                                                        console.warn('❌ currentElements is not an array');
                                                         return currentElements || [];
                                                     }
                                                     
-                                                    // Create a deep copy
+                                                    // Create a deep copy while preserving virtual element properties
                                                     const updatedElements = currentElements.map(el => ({
                                                         ...el,
-                                                        children: Array.isArray(el.children) ? [...el.children] : []
+                                                        children: Array.isArray(el.children) ? [...el.children] : [],
+                                                        // Preserve virtual element properties
+                                                        ...(el.isVirtual && {
+                                                            isVirtual: el.isVirtual,
+                                                            sourceTab: el.sourceTab,
+                                                            isViewBlueprint: el.isViewBlueprint,
+                                                            originalBlueprintId: el.originalBlueprintId
+                                                        }),
+                                                        // Preserve slot properties
+                                                        ...(el.componentId === 'slot' && {
+                                                            componentId: 'slot'
+                                                        })
                                                     }));
                                                     
                                                     // Find the moved element
@@ -139,7 +227,14 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                                     const movedElement = updatedElements[movedElementIndex];
                                                     
                                                     if (!movedElement || movedElementIndex === -1) {
-                                                        console.warn('❌ Moved element not found in state:', movedId);
+                                                        
+                                                        return currentElements;
+                                                    }
+                                                    
+                                                    // Double-check that we're not moving a virtual element
+                                                    if (movedElement.isVirtual || movedElement.componentId === 'slot') {
+                                                        
+                                                        isProcessingUpdate.current = false;
                                                         return currentElements;
                                                     }
                                                     
@@ -148,8 +243,6 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                                         ...movedElement,
                                                         parent: newParentId
                                                     };
-                                                    
-                        
                                                     
                                                     // Update the parent container's children array
                                                     const parentId = newParentId || oldParentId;
@@ -160,29 +253,47 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                                         if (parentIndex !== -1) {
                                                             if (oldParentId === newParentId) {
                                                                 // Same container reordering
-                                                                
                                                                 const currentChildren = [...updatedElements[parentIndex].children];
                                                                 const domChildren = newParentChildren.filter(id => id && id.trim() !== '');
                                                                 
-                                                                // Find children that exist in state but not in DOM (preserve them)
-                                                                const missingFromDOM = currentChildren.filter(id => !domChildren.includes(id));
+                                                                // Preserve virtual children that exist in state but not in DOM
+                                                                const virtualChildren = currentChildren.filter(childId => {
+                                                                    const childElement = updatedElements.find(el => el.i === childId);
+                                                                    return childElement && (childElement.isVirtual || childElement.componentId === 'slot');
+                                                                });
                                                                 
-                                                                // Create new order: DOM order + preserved missing children
-                                                                const newOrder = [...domChildren, ...missingFromDOM];
+                                                                // Find non-virtual children that exist in state but not in DOM
+                                                                const missingNonVirtualChildren = currentChildren.filter(childId => {
+                                                                    const childElement = updatedElements.find(el => el.i === childId);
+                                                                    return childElement && 
+                                                                           !childElement.isVirtual && 
+                                                                           childElement.componentId !== 'slot' && 
+                                                                           !domChildren.includes(childId);
+                                                                });
+                                                                
+                                                                // Create new order: DOM order + preserved missing children + virtual children
+                                                                const newOrder = [...domChildren, ...missingNonVirtualChildren, ...virtualChildren];
                                                                 
                                                                 updatedElements[parentIndex] = {
                                                                     ...updatedElements[parentIndex],
                                                                     children: newOrder
                                                                 };
-                                                                
                                                             } else {
                                                                 // Different container move
                                                                 
-                                                                // Update old parent (remove moved item)
+                                                                // Update old parent (remove moved item, preserve virtual children)
                                                                 if (oldParentId) {
                                                                     const oldParentIndex = updatedElements.findIndex(el => el?.i === oldParentId);
                                                                     if (oldParentIndex !== -1) {
-                                                                        const filteredOldChildren = (oldParentChildren || []).filter(id => id !== movedId);
+                                                                        const currentOldChildren = [...updatedElements[oldParentIndex].children];
+                                                                        
+                                                                        // Keep virtual children and non-moved children
+                                                                        const filteredOldChildren = currentOldChildren.filter(childId => {
+                                                                            if (childId === movedId) return false; // Remove moved element
+                                                                            const childElement = updatedElements.find(el => el.i === childId);
+                                                                            return childElement; // Keep all other children including virtual ones
+                                                                        });
+                                                                        
                                                                         updatedElements[oldParentIndex] = {
                                                                             ...updatedElements[oldParentIndex],
                                                                             children: filteredOldChildren
@@ -190,11 +301,27 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                                                     }
                                                                 }
                                                                 
-                                                                // Update new parent (use DOM order + preserve missing)
+                                                                // Update new parent (use DOM order + preserve missing + preserve virtual)
                                                                 const currentNewParentChildren = [...updatedElements[parentIndex].children];
                                                                 const domChildren = newParentChildren.filter(id => id && id.trim() !== '');
-                                                                const missingFromDOM = currentNewParentChildren.filter(id => !domChildren.includes(id) && id !== movedId);
-                                                                const newOrder = [...domChildren, ...missingFromDOM];
+                                                                
+                                                                // Preserve virtual children
+                                                                const virtualChildren = currentNewParentChildren.filter(childId => {
+                                                                    const childElement = updatedElements.find(el => el.i === childId);
+                                                                    return childElement && (childElement.isVirtual || childElement.componentId === 'slot');
+                                                                });
+                                                                
+                                                                // Find missing non-virtual children
+                                                                const missingNonVirtualChildren = currentNewParentChildren.filter(childId => {
+                                                                    const childElement = updatedElements.find(el => el.i === childId);
+                                                                    return childElement && 
+                                                                           !childElement.isVirtual && 
+                                                                           childElement.componentId !== 'slot' && 
+                                                                           !domChildren.includes(childId) && 
+                                                                           childId !== movedId;
+                                                                });
+                                                                
+                                                                const newOrder = [...domChildren, ...missingNonVirtualChildren, ...virtualChildren];
                                                                 
                                                                 updatedElements[parentIndex] = {
                                                                     ...updatedElements[parentIndex],
@@ -202,43 +329,80 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                                                                 };
                                                             }
                                                         } else {
-                                                            console.warn('❌ Parent container not found:', parentId);
+                                                            
                                                         }
                                                     }
                                                     
                                                     return updatedElements;
                                                     
                                                 } catch (stateError) {
-                                                    console.error('❌ Error in state update:', stateError);
+                                                    
                                                     return currentElements || [];
                                                 }
                                             });
                                         } else {
-                                            console.warn('❌ setElements not available or not a function');
+                                            
                                         }
                                     } catch (setElementsError) {
-                                        console.error('❌ Error calling setElements:', setElementsError);
-                                    } finally {
-                                        // Clean up after state update completes
-                                        setTimeout(() => {
-                                            removeDuplicateElements();
-                                            isProcessingUpdate.current = false;
-                                        }, 50);
+                                        
                                     }
-                                }, 0); // Immediate but deferred execution
+                                    
+                                    // Clean up after state update completes
+                                    setTimeout(() => {
+                                        removeDuplicateElements();
+                                        isProcessingUpdate.current = false;
+                                        setSortableOperationState?.(false);
+                                    }, 150);
+                                }, 100); // Immediate but deferred execution
                                 
                             } catch (onEndError) {
-                                console.error('❌ Error in onEnd handler:', onEndError);
+                                
                                 isProcessingUpdate.current = false;
+                                setSortableOperationState?.(false);
                             }
                         },
                         
-                        // Prevent DOM conflicts during rapid updates
+                        // Prevent DOM conflicts during rapid updates and external drops
                         onMove: (evt, originalEvent) => {
                             if (isProcessingUpdate.current) {
                                 return false; // Temporarily prevent moves during state updates
                             }
-                            return true;
+                            
+                            const draggedElement = evt.dragged;
+                            const elementId = draggedElement?.id;
+                            const element = elementss?.find(el => el.i === elementId);
+                            
+                            // Block external drops from component library
+                            // If the dragged element doesn't exist in our elements array, it's external
+                            if (!element) {
+                                
+                                return false;
+                            }
+                            
+                            // Block virtual elements and slots
+                            if (element?.isVirtual || element?.componentId === 'slot') {
+                                
+                                return false;
+                            }
+                            
+                            // Only allow drops into containers with isGroup: true
+                            const targetElement = evt.to;
+                            const targetId = targetElement?.getAttribute?.('data-id') || targetElement?.id;
+                            const targetElementData = elementss?.find(el => el.i === targetId);
+                            
+                            if (targetElementData) {
+                                // ONLY allow drops into elements where isGroup is true
+                                if (targetElementData.isGroup === true) {
+                                    
+                                    return true;
+                                } else {
+                                    
+                                    return false;
+                                }
+                            }
+                            
+                            
+                            return false;
                         }
                     });
                     
@@ -248,12 +412,12 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                     }
                     
                 } catch (containerError) {
-                    console.error('❌ Error setting up sortable for container:', containerError);
+                    
                 }
             });
 
         } catch (setupError) {
-            console.error('❌ Error in sortable setup:', setupError);
+            
         }
 
         // Cleanup function
@@ -265,13 +429,15 @@ export const SortableContainerSetup = ({ elementss, setElements }) => {
                             instance.destroy();
                         }
                     } catch (cleanupError) {
-                        console.warn('Error in cleanup:', cleanupError);
+                        
                     }
                 });
                 sortableInstances.current = [];
                 isProcessingUpdate.current = false;
+                setSortableOperationState?.(false);
             } catch (cleanupError) {
-                console.error('Error in cleanup function:', cleanupError);
+                
+                setSortableOperationState?.(false);
             }
         };
     }, [elementss]);

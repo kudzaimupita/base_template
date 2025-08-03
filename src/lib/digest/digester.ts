@@ -213,7 +213,7 @@ class MessageLogger {
       try {
         callback(logEntry);
       } catch (error) {
-        // console.error('Error in message logger subscriber:', error);
+        // 
       }
     });
   }

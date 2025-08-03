@@ -51,7 +51,7 @@ const renderElementUtil = (
         configuration: {}
       };
     } else {
-      console.error('Blueprint not found in elements or views');
+      
       return;
     }
   }
@@ -151,7 +151,7 @@ const renderElementUtil = (
       const parentElementIndex = prevElements.findIndex((el) => el.i === targetElement);
 
       if (parentElementIndex === -1) {
-        console.error('Parent element not found');
+        
         return prevElements;
       }
 
@@ -354,8 +354,7 @@ const renderElementUtil = (
       });
 
     } else {
-      // Handle regular element injection
-      message.info('process?.propsMapper?.renderType')
+   
       // Process property mappings for all mapped elements
       propsMap.forEach((mapItem) => {
         processPropertyMappings(mapItem?.element,mapItem?.element,mapItem?.element);

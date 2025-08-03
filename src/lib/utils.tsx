@@ -46,10 +46,10 @@ export function createEventHandlers(item, currentApplication, navigate, params, 
      
       handlers[eventName] = (e) => {
   
-        if (item?.configuration?.[eventName]?.preventDefault) {
+        if (item?.configuration?.[eventName]?.preventDefaultprocess?.stopPropagation !== false) {
           e.preventDefault();
         }
-        if (item?.configuration?.[eventName]?.stopPropagation) {
+        if (item?.configuration?.[eventName]?.stopPropagationprocess?.stopPropagation !== false) {
           e.stopPropagation();
         }
 
@@ -98,6 +98,7 @@ export function renderComponent(id, props, componentsMap, editMode, elements, se
 
     return (
       <InlineEditText
+      id={props.i}
         isEditable={false}
         overflowEffect="elipsis"
         targeted={true}
@@ -593,7 +594,7 @@ export function processObjectTemplatesAndReplace(obj, process, mapItem, tab) {
 
         return result;
       } catch (error) {
-        console.error(`Error processing template ${current}:`, error);
+        
         return current.slice(2, -2).trim();
       }
     }
@@ -642,7 +643,7 @@ export function clearOptimizationCaches() {
   templateCache.clear();
   pathCache.clear();
 }
-export function createBaseProps(item, index, isHovered, readOnly, editMode, setisHovered, setCommentPos, setActiveDrawingPathId, setIsDrawingPathActive, isDrawingPathActive, setSelectedElements, processedStyle, builderCursorMode, isLayout, createEventHandlers) {
+export function createBaseProps(item, index, isHovered, readOnly, editMode, setisHovered, setCommentPos, setActiveDrawingPathId, setIsDrawingPathActive, isDrawingPathActive, setTargets, processedStyle, builderCursorMode, isLayout, createEventHandlers) {
   return {
     key: item.i || index,
     id: item.i || index,
@@ -653,18 +654,47 @@ export function createBaseProps(item, index, isHovered, readOnly, editMode, seti
       if (item.componentId === 'drawpath' && isDrawingPathActive) {
         setIsDrawingPathActive(false);
       }
-      setCommentPos?.(e);
+      if (builderCursorMode === 'comment') {
+        setCommentPos?.(e);
+      } else if (builderCursorMode === 'xray') {
+        // Handle xray mode click - select the clicked element
+
+        if (setTargets) {
+          const domElement = document.getElementById(item.i);
+        
+          if (domElement) {
+            setTargets([domElement]);
+     
+          }
+        } else {
+    
+        }
+      }
     },
     onDoubleClick: (e) => {
       e.stopPropagation();
       if (item.componentId === 'drawpath') {
         setActiveDrawingPathId(item.i);
         setIsDrawingPathActive(!isDrawingPathActive);
-        setSelectedElements([]);
+        setTargets([]);
       }
     },
     style: processedStyle,
-    className: `${item?.isGroup ? 'group-container ' : ''}${item?.configuration?.classNames || ''} ${builderCursorMode === 'hand' ? 'cursor-grab active:cursor-grabbing !pointer-events-none' : builderCursorMode === 'draw' ? '!cursor-draw !pointer-events-none !disabled' : builderCursorMode === 'path' ? 'cursor-path' : builderCursorMode === 'comment' ? '!cursor-comment !pointer-events-none' : editMode && !isDrawingPathActive && builderCursorMode === 'default' ? `${!isLayout && 'cube'} active:cursor-grabbing` : `${!isLayout && 'cube'}  active:cursor-grabbing`}`,
+    className: `${item?.isGroup ? 'group-container ' : ''}${item?.configuration?.classNames || ''} ${
+      builderCursorMode === 'hand' 
+        ? 'cursor-grab active:cursor-grabbing !pointer-events-none' 
+        : builderCursorMode === 'draw' 
+          ? '!cursor-draw !pointer-events-none !disabled' 
+          : builderCursorMode === 'path' 
+            ? 'cursor-path' 
+            : builderCursorMode === 'comment' 
+              ? '!cursor-comment !pointer-events-none' 
+              : builderCursorMode === 'xray'
+                ? '!cursor-xray'
+                : editMode && !isDrawingPathActive && builderCursorMode === 'default' 
+                  ? `${!isLayout && 'cube'} active:cursor-grabbing` 
+                  : `${!isLayout && 'cube'}  active:cursor-grabbing`
+    }`,
     ...(editMode ? {} : { events: createEventHandlers(item) }),
     ...(editMode ? {} : createEventHandlers(item)),
   };

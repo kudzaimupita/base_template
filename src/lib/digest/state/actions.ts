@@ -2,7 +2,7 @@ import { getUrlDetails, getValueByPath, retrieveBody } from './utils';
 import { initJsonDebugStyles, logJsonDebug } from './debug';
 
 import axios from 'axios';
-import { get, isArray } from 'lodash';
+import _ from 'lodash';
 import { message } from 'antd';
 import { messageLogger } from '../digester';
 import { createEventHandler } from '../../utils';
@@ -128,7 +128,7 @@ export const statePlugin = {
             data: newState,
           };
         } catch (error) {
-          console.error(error);
+          
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {
             ...globalErrors?.[process.name],
@@ -201,7 +201,7 @@ export const statePlugin = {
             data: newState,
           };
         } catch (error) {
-          console.error(error);
+          
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {
             ...globalErrors?.[process.name],
@@ -290,287 +290,101 @@ export const statePlugin = {
     },
 {
   key: 'state-setState',
-  label: 'Set State (Advanced)',
+  label: 'Set State',
   schema: {
     $schema: 'http://json-schema.org/draft-07/schema#',
     type: 'object',
     properties: {
       name: {
         type: 'string',
+        title: 'Step Name',
         pattern: '^[^.]+$',
-        description: 'Variable name to store operation result (no spaces, caps)',
+        description: 'Name for this state operation',
+        default: 'setState'
       },
-      level: {
+      stateConfig: {
         type: 'string',
-        title: 'State Level',
-        enum: ['view', 'global'],
-        default: 'view',
-        description: 'Whether to update view-level or global state',
-      },
-      elementOverride: {
-        title: 'Target Element',
-        type: 'string',
-        pattern: '^[^.]+$',
-        description: 'Specific element to target (overrides component ID)',
+        title: 'State Configuration', 
         config: {
-          uiType: 'elementSelect',
+          uiType: 'SetStateField'
         },
-      },
-      operation: {
-        type: 'string',
-        title: 'Update Operation',
-        enum: ['set', 'merge', 'spread', 'append', 'prepend', 'delete', 'toggle', 'increment', 'decrement', 'bulk'],
-        default: 'set',
-        description: 'Type of state update operation to perform',
-      },
-      key: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'string',
-            title: 'State Key Path',
-            description: 'Dot-notation path to state property (e.g., "user.profile.name")',
-          },
-        },
-        required: ['value'],
-      },
-      payload: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'string',
-            title: 'Payload Data',
-            description: 'Value to set, merge, or operate with (JSON string or literal)',
-          },
-        },
-      },
-      mergeStrategy: {
-        type: 'string',
-        title: 'Merge Strategy',
-        enum: ['shallow', 'deep', 'replace'],
-        default: 'shallow',
-        description: 'How to merge objects when using merge operation',
-      },
-      spreadProperties: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'string',
-            title: 'Properties to Spread (JSON)',
-            description: 'Specific properties to spread from source object',
-            default: '[]',
-          },
-        },
-      },
-      conditionalUpdate: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'string',
-            title: 'Conditional Expression',
-            description: 'JavaScript expression to evaluate before updating (optional)',
-          },
-        },
-      },
-      transformFunction: {
-        type: 'string',
-        title: 'Transform Function',
-        description: 'Custom function to transform payload before setting',
-        config: { uiType: 'eventHandler' },
-      },
-      arrayOperation: {
-        type: 'string',
-        title: 'Array Operation',
-        enum: ['push', 'unshift', 'pop', 'shift', 'splice', 'filter', 'map', 'sort'],
-        description: 'Specific array operation when target is an array',
-      },
-      arrayIndex: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'number',
-            title: 'Array Index',
-            description: 'Index for array operations (splice, insert)',
-            minimum: 0,
-          },
-        },
-      },
-      deleteCount: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'number',
-            title: 'Delete Count',
-            description: 'Number of elements to delete (for splice operation)',
-            minimum: 0,
-            default: 1,
-          },
-        },
-      },
-      bulkUpdates: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'string',
-            title: 'Bulk Updates (JSON Array)',
-            description: 'Array of {key, payload, operation} objects for bulk operations',
-            default: '[]',
-          },
-        },
-      },
-      preserveReferences: {
-        type: 'string',
-        title: 'Preserve References',
-        enum: ['true', 'false'],
-        default: 'false',
-        description: 'Whether to preserve object references (performance vs immutability)',
-      },
-      notifyChange: {
-        type: 'string',
-        title: 'Notify Change',
-        enum: ['true', 'false'],
-        default: 'true',
-        description: 'Whether to trigger state change notifications',
-      },
-      debounceMs: {
-        type: 'object',
-        properties: {
-          value: {
-            type: 'number',
-            title: 'Debounce (ms)',
-            description: 'Debounce state updates by specified milliseconds',
-            minimum: 0,
-            maximum: 5000,
-          },
-        },
-      },
-      onSuccess: {
-        type: 'string',
-        config: { uiType: 'eventHandler' },
-        title: 'On Success Handler',
-        description: 'Code to execute after successful state update',
-      },
-      onError: {
-        type: 'string',
-        config: { uiType: 'eventHandler' },
-        title: 'On Error Handler',
-        description: 'Code to execute if state update fails',
-      },
-      validatePayload: {
-        type: 'string',
-        title: 'Validate Payload',
-        enum: ['true', 'false'],
-        default: 'true',
-        description: 'Whether to validate payload before updating state',
-      },
-      logOperation: {
-        type: 'string',
-        title: 'Log Operation',
-        enum: ['true', 'false'],
-        default: 'false',
-        description: 'Whether to log state operations for debugging',
+        default: JSON.stringify({
+          operation: 'set',
+          key: '',
+          payload: '',
+          elementOverride: '',
+          mergeStrategy: 'shallow',
+          arrayOperation: 'push',
+          arrayIndex: 0,
+          deleteCount: 1,
+          separator: ' '
+        })
       },
     },
-    required: ['name', 'key'],
+    required: ['name', 'stateConfig'],
   },
   process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
     try {
-      // Initialize debounce storage if needed
-      if (!globalThis._stateDebounceTimers) {
-        globalThis._stateDebounceTimers = new Map();
+      // Extract config from the stateConfig property (now a JSON string)
+      let config = {};
+      try {
+        config = typeof process.stateConfig === 'string' 
+          ? JSON.parse(process.stateConfig) 
+          : (process.stateConfig || {});
+      } catch (e) {
+        console.error('Failed to parse stateConfig:', e);
+        config = {};
       }
-
-      // Helper function to deep clone objects
-      const deepClone = (obj) => {
-        if (obj === null || typeof obj !== 'object') return obj;
-        if (obj instanceof Date) return new Date(obj);
-        if (obj instanceof Array) return obj.map(item => deepClone(item));
-        if (typeof obj === 'object') {
-          const cloned = {};
-          Object.keys(obj).forEach(key => {
-            cloned[key] = deepClone(obj[key]);
-          });
-          return cloned;
-        }
-        return obj;
-      };
-
-      // Helper function to safely parse JSON
-      const safeJsonParse = (str, fallback = null) => {
-        if (!str || typeof str !== 'string') return fallback;
-        try {
-          return JSON.parse(str);
-        } catch (e) {
-          return str; // Return as string if not valid JSON
-        }
-      };
-
-      // Helper function to evaluate conditional expressions
-      const evaluateCondition = (condition, context) => {
-        if (!condition) return true;
-        try {
-          // Create a safe evaluation context
-          const func = new Function('event', 'globalObj', 'paramState', 'currentValue', `return ${condition}`);
-          return func(context.event, context.globalObj, context.paramState, context.currentValue);
-        } catch (e) {
-          messageLogger.warn(`Conditional evaluation failed: ${e.message}`);
-          return false;
-        }
-      };
-
-      // Extract parameters
-      const operation = process.operation || 'set';
-      const level = process.level || 'view';
-      const validatePayload = retrieveBody('true', process.validatePayload, event, globalObj, paramState, sessionKey, process) === 'true';
-      const logOperation = retrieveBody('false', process.logOperation, event, globalObj, paramState, sessionKey, process) === 'true';
-      const preserveReferences = retrieveBody('false', process.preserveReferences, event, globalObj, paramState, sessionKey, process) === 'true';
-      const notifyChange = retrieveBody('true', process.notifyChange, event, globalObj, paramState, sessionKey, process) === 'true';
-      const debounceMs = parseInt(retrieveBody(0, process.debounceMs?.value, event, globalObj, paramState, sessionKey, process), 10) || 0;
-      const mergeStrategy = process.mergeStrategy || 'shallow';
-      const arrayOperation = process.arrayOperation;
-      const arrayIndex = parseInt(retrieveBody(-1, process.arrayIndex?.value, event, globalObj, paramState, sessionKey, process), 10);
-      const deleteCount = parseInt(retrieveBody(1, process.deleteCount?.value, event, globalObj, paramState, sessionKey, process), 10);
+      
+      // Extract parameters from config
+      const operation = config.operation || 'set';
+      const mergeStrategy = config.mergeStrategy || 'shallow';
+      const arrayOperation = config.arrayOperation || 'push';
+      const arrayIndex = parseInt(String(config.arrayIndex || 0), 10);
+      const deleteCount = parseInt(String(config.deleteCount || 1), 10);
 
       // Build state key path
       let keyPath = '';
-      if (level === 'view') {
-        if (process.pageId) keyPath = process.pageId;
-        if (process?.elementOverride) {
-          keyPath = keyPath ? `${keyPath}.${process.elementOverride}` : process.elementOverride;
+      // if (level === 'view') {
+        // if (process.pageId) keyPath = process.pageId;
+        if (config?.elementOverride) {
+          keyPath = keyPath ? `${config.elementOverride}` : config.elementOverride;
         } else {
-          keyPath = keyPath ? `${keyPath}.${process.compId}` : process.compId;
+          keyPath = keyPath ? `${process.compId}` : process.compId;
         }
-      }
+      // }
 
-      const baseKey = retrieveBody('', process.key?.value, event, globalObj, paramState, sessionKey, process);
+      const baseKey = retrieveBody('', String(config.key || ''), event, globalObj, paramState, sessionKey, process);
       const fullKey = keyPath ? `${keyPath}.${baseKey}` : baseKey;
 
       if (!fullKey) {
         throw new Error('State key path is required');
       }
 
-      // Get current value for conditional checks and transforms
-      const currentValue = get(globalObj.appState || {}, fullKey);
-
-      // Evaluate conditional update
-      const conditionalExpr = retrieveBody('', process.conditionalUpdate?.value, event, globalObj, paramState, sessionKey, process);
-      if (conditionalExpr && !evaluateCondition(conditionalExpr, { event, globalObj, paramState, currentValue })) {
-        messageLogger.info(`Conditional update skipped for key: ${fullKey}`);
-        globalObj[process.name] = { skipped: true, key: fullKey };
-        return;
-      }
-
       // Process payload
-      let payload = retrieveBody('', process.payload?.value, event, globalObj, paramState, sessionKey, process);
-      
-      // Try to parse payload as JSON if it's a string
-      if (typeof payload === 'string' && payload.trim()) {
-        payload = safeJsonParse(payload, payload);
+      let payload;
+      if (typeof config.payload === 'string') {
+        // If it's a string, process it with retrieveBody and try to parse as JSON
+        payload = retrieveBody('', config.payload, event, globalObj, paramState, sessionKey, process);
+        if (typeof payload === 'string' && payload.trim()) {
+          try {
+            payload = JSON.parse(payload);
+          } catch (e) {
+            // Keep as string if not valid JSON
+          }
+        }
+      } else if (config.payload !== undefined && config.payload !== null) {
+        // If it's already an object, use it directly
+        payload = config.payload;
+      } else {
+        // Default to empty string if no payload
+        payload = '';
       }
 
       // Apply transform function if provided
-      if (process.transformFunction) {
+      if (config.transformFunction) {
         try {
+          const currentValue = _.get(globalObj.appState || {}, fullKey);
           const transformContext = {
             currentValue,
             payload,
@@ -580,7 +394,7 @@ export const statePlugin = {
             fullKey,
           };
           
-          payload = createEventHandler(transformContext, process.transformFunction, process.compId, {}, navigate, paramState, 
+          payload = createEventHandler(transformContext, config.transformFunction, process.compId, {}, navigate, paramState, 
             process.pageId, process.editMode, process.store, process?.refreshAppAuth,
             process?.setDestroyInfo, process.setSessionInfo, process?.setAppStatePartial, () => '');
         } catch (transformError) {
@@ -589,287 +403,126 @@ export const statePlugin = {
         }
       }
 
-      // Validate payload if enabled
-      if (validatePayload && payload === undefined) {
-        throw new Error('Payload is required and cannot be undefined');
-      }
+
+
+      // Helper function to safely parse JSON
+      const safeJsonParse = (str, fallback = []) => {
+        if (!str || typeof str !== 'string' || str.trim() === '') {
+          return fallback;
+        }
+        try {
+          return JSON.parse(str);
+        } catch (e) {
+          console.warn('JSON parse error:', e.message, 'Input:', str);
+          return fallback;
+        }
+      };
+
+      // Prepare operation config
+      const operationConfig = {
+        mergeStrategy,
+        arrayOperation,
+        arrayIndex: arrayIndex >= 0 ? arrayIndex : undefined,
+        deleteCount,
+        separator: config.separator || ' ',
+      };
 
       // Define the update operation
       const performUpdate = () => {
-        let finalPayload = payload;
-        let updateResult = {};
-
         try {
-          switch (operation) {
-            case 'set':
-              updateResult[fullKey] = finalPayload;
-              break;
-
-            case 'merge':
-              const currentObj = currentValue || {};
-              if (typeof currentObj !== 'object' || Array.isArray(currentObj)) {
-                throw new Error('Cannot merge into non-object value');
-              }
+          if (process?.store?.dispatch && process?.setAppStatePartial) {
+            // Get element context for operations that need access to element configuration
+            const elementContext = config.elementOverride ? (() => {
+              // Find the element in allElements first (immediate access)
+              const elementFromAllElements = globalObj.allElements?.find(el => el.i === config.elementOverride);
               
-              if (mergeStrategy === 'deep') {
-                finalPayload = { ...deepClone(currentObj), ...deepClone(finalPayload) };
-              } else if (mergeStrategy === 'shallow') {
-                finalPayload = { ...currentObj, ...finalPayload };
-              } else { // replace
-                finalPayload = finalPayload;
-              }
-              updateResult[fullKey] = finalPayload;
-              break;
-
-            case 'spread':
-              const spreadProps = safeJsonParse(retrieveBody('[]', process.spreadProperties?.value, event, globalObj, paramState, sessionKey, process), []);
-              const sourceObj = finalPayload || {};
-              const targetObj = currentValue || {};
-              
-              if (Array.isArray(spreadProps) && spreadProps.length > 0) {
-                // Spread only specific properties
-                const spreadData = {};
-                spreadProps.forEach(prop => {
-                  if (sourceObj.hasOwnProperty(prop)) {
-                    spreadData[prop] = sourceObj[prop];
+              // Use store.getState() to access currentApplication from Redux store
+              let elementFromCurrentApp = null;
+              if (process.store) {
+                const rootState = process.store.getState();
+                const currentApplication = rootState.currentAppState?.currentApplication;
+                
+                if (currentApplication?.views && process.pageId) {
+                  const targetView = currentApplication.views.find(view => view.id === process.pageId);
+                  if (targetView?.layout) {
+                    elementFromCurrentApp = targetView.layout.find(element => element.i === config.elementOverride);
                   }
-                });
-                finalPayload = { ...targetObj, ...spreadData };
-              } else {
-                // Spread all properties
-                finalPayload = { ...targetObj, ...sourceObj };
-              }
-              updateResult[fullKey] = finalPayload;
-              break;
-
-            case 'append':
-            case 'prepend':
-              const currentArray = Array.isArray(currentValue) ? currentValue : [];
-              if (operation === 'append') {
-                finalPayload = [...currentArray, finalPayload];
-              } else {
-                finalPayload = [finalPayload, ...currentArray];
-              }
-              updateResult[fullKey] = finalPayload;
-              break;
-
-            case 'delete':
-              // Use lodash unset or similar logic
-              if (currentValue !== undefined) {
-                const parentPath = fullKey.substring(0, fullKey.lastIndexOf('.'));
-                const propertyName = fullKey.substring(fullKey.lastIndexOf('.') + 1);
-                const parentObj = get(globalObj.appState || {}, parentPath);
-                
-                if (parentObj && typeof parentObj === 'object') {
-                  const newParentObj = { ...parentObj };
-                  delete newParentObj[propertyName];
-                  updateResult[parentPath] = newParentObj;
                 }
               }
-              break;
-
-            case 'toggle':
-              finalPayload = !currentValue;
-              updateResult[fullKey] = finalPayload;
-              break;
-
-            case 'increment':
-              const currentNum = typeof currentValue === 'number' ? currentValue : 0;
-              const incrementBy = typeof finalPayload === 'number' ? finalPayload : 1;
-              finalPayload = currentNum + incrementBy;
-              updateResult[fullKey] = finalPayload;
-              break;
-
-            case 'decrement':
-              const currentNumDec = typeof currentValue === 'number' ? currentValue : 0;
-              const decrementBy = typeof finalPayload === 'number' ? finalPayload : 1;
-              finalPayload = currentNumDec - decrementBy;
-              updateResult[fullKey] = finalPayload;
-              break;
-
-            case 'bulk':
-              const bulkUpdates = safeJsonParse(retrieveBody('[]', process.bulkUpdates?.value, event, globalObj, paramState, sessionKey, process), []);
               
-              if (!Array.isArray(bulkUpdates)) {
-                throw new Error('Bulk updates must be an array');
-              }
-
-              const bulkPayload = bulkUpdates.map(update => ({
-                key: update.key ? (keyPath ? `${keyPath}.${update.key}` : update.key) : fullKey,
-                payload: update.payload,
-                operation: update.operation || 'set',
-              }));
-
-              // Use the bulk action
-              if (notifyChange && process?.store?.dispatch && process?.bulkSetAppState) {
-                process.store.dispatch(process.bulkSetAppState(bulkPayload));
-              }
+              // Use the most complete element configuration available
+              const bestElement = elementFromCurrentApp || elementFromAllElements;
               
-              globalObj[process.name] = {
-                success: true,
-                operations: bulkPayload.length,
-                keys: bulkPayload.map(u => u.key),
-                timestamp: new Date().toISOString(),
+              return {
+                elementId: config.elementOverride,
+                elementConfiguration: bestElement?.configuration || bestElement,
+                allElements: globalObj.allElements,
+                viewId: process.pageId,
+                pageId: process.pageId,
+                compId: config.elementOverride,
+                // Pass the complete element for debugging
+                completeElement: bestElement
               };
-              return;
+            })() : undefined;
 
-            default:
-              // Handle array operations
-              if (arrayOperation && Array.isArray(currentValue)) {
-                let newArray = [...currentValue];
-                
-                switch (arrayOperation) {
-                  case 'push':
-                    newArray.push(finalPayload);
-                    break;
-                  case 'unshift':
-                    newArray.unshift(finalPayload);
-                    break;
-                  case 'pop':
-                    newArray.pop();
-                    break;
-                  case 'shift':
-                    newArray.shift();
-                    break;
-                  case 'splice':
-                    if (arrayIndex >= 0) {
-                      newArray.splice(arrayIndex, deleteCount, finalPayload);
-                    }
-                    break;
-                  case 'filter':
-                    // Expect payload to be a filter function string
-                    if (typeof finalPayload === 'string') {
-                      const filterFunc = new Function('item', 'index', 'array', `return ${finalPayload}`);
-                      newArray = newArray.filter(filterFunc);
-                    }
-                    break;
-                  case 'map':
-                    // Expect payload to be a map function string
-                    if (typeof finalPayload === 'string') {
-                      const mapFunc = new Function('item', 'index', 'array', `return ${finalPayload}`);
-                      newArray = newArray.map(mapFunc);
-                    }
-                    break;
-                  case 'sort':
-                    // Expect payload to be a compare function string or null for default sort
-                    if (typeof finalPayload === 'string') {
-                      const compareFunc = new Function('a', 'b', `return ${finalPayload}`);
-                      newArray.sort(compareFunc);
-                    } else {
-                      newArray.sort();
-                    }
-                    break;
-                }
-                
-                finalPayload = newArray;
-                updateResult[fullKey] = finalPayload;
-              } else {
-                // Default to set operation
-                updateResult[fullKey] = finalPayload;
-              }
-              break;
-          }
+            // Dispatch to the enhanced setAppStatePartial reducer
+            process.store.dispatch(process.setAppStatePartial({
+              key: fullKey,
+              payload,
+              operationType: operation,
+              operationConfig,
+              elementContext
+            }));
 
-          // Log operation if enabled
-          if (logOperation) {
-            messageLogger.info(`State operation '${operation}' on key '${fullKey}' with payload:`, finalPayload);
-          }
 
-          // Dispatch state update
-          if (notifyChange && process?.store?.dispatch && process?.setAppStatePartial) {
-            Object.entries(updateResult).forEach(([key, value]) => {
-              process.store.dispatch(process.setAppStatePartial({ key, payload: value }));
-            });
-          }
 
-          // Store operation result
-          globalObj[process.name] = {
-            success: true,
-            operation,
-            key: fullKey,
-            previousValue: currentValue,
-            newValue: finalPayload,
-            timestamp: new Date().toISOString(),
-          };
-
-          // Execute success handler
-          if (process.onSuccess) {
-            try {
-              const successContext = {
+            // Store operation result
+            globalObj[process.name || 'setState'] = {
+              success: true,
+              operation,
+              key: fullKey,
+              payload,
+              timestamp: new Date().toISOString(),
+              metadata: {
                 operation,
-                key: fullKey,
-                previousValue: currentValue,
-                newValue: finalPayload,
-                event,
-                globalObj,
-              };
-              
-              createEventHandler(successContext, process.onSuccess, process.compId, {}, navigate, paramState, 
-                process.pageId, process.editMode, process.store, process?.refreshAppAuth,
-                process?.setDestroyInfo, process.setSessionInfo, process?.setAppStatePartial, () => '');
-            } catch (handlerError) {
-              messageLogger.error(`Success handler error: ${handlerError.message}`);
-            }
+                key: config?.key,
+                payload: config?.payload,
+                elementOverride: config?.elementOverride,
+                mergeStrategy,
+                compId: process.compId,
+                keyPath,
+                baseKey,
+              },
+            };
+
+            messageLogger.success(`State ${operation} operation completed for key: ${fullKey}`);
+          } else {
+            throw new Error('Redux store or setAppStatePartial action not available');
           }
-
-          messageLogger.success(`State ${operation} operation completed for key: ${fullKey}`);
-
         } catch (operationError) {
           throw new Error(`${operation} operation failed: ${operationError.message}`);
         }
       };
 
-      // Handle debouncing
-      if (debounceMs > 0) {
-        const debounceKey = `${fullKey}_${operation}`;
-        
-        // Clear existing timer
-        if (globalThis._stateDebounceTimers.has(debounceKey)) {
-          clearTimeout(globalThis._stateDebounceTimers.get(debounceKey));
-        }
-        
-        // Set new timer
-        const timerId = setTimeout(() => {
-          performUpdate();
-          globalThis._stateDebounceTimers.delete(debounceKey);
-        }, debounceMs);
-        
-        globalThis._stateDebounceTimers.set(debounceKey, timerId);
-        
-        globalObj[process.name] = {
-          debounced: true,
-          key: fullKey,
-          operation,
-          debounceMs,
-        };
-      } else {
-        // Execute immediately
-        performUpdate();
-      }
+      // Execute the update
+      performUpdate();
 
     } catch (error) {
-      // Prepare error details
+   
+      // Prepare error details  
+      const errorName = process?.name || 'setState';
       const errorDetails = {
-        ...globalErrors?.[process.name],
+        ...globalErrors?.[errorName],
         error: error.message || 'State operation failed',
-        operation: process.operation || 'set',
-        key: process.key?.value,
+        // operation: config?.operation || 'set',
+        // key: config?.key,
         timestamp: new Date().toISOString(),
       };
 
       // Store error
-      globalErrors[process.name] = errorDetails;
+      globalErrors[errorName] = errorDetails;
 
-      // Execute error handler
-      if (process.onError) {
-        try {
-          createEventHandler(errorDetails, process.onError, process.compId, {}, navigate, paramState, 
-            process.pageId, process.editMode, process.store, process?.refreshAppAuth,
-            process?.setDestroyInfo, process.setSessionInfo, process?.setAppStatePartial, () => '');
-        } catch (handlerError) {
-          messageLogger.error(`Error handler error: ${handlerError.message}`);
-        }
-      }
+
 
       messageLogger.error(`State operation failed: ${error.message}`);
       throw error;
@@ -893,7 +546,7 @@ export const statePlugin = {
             properties: {
               value: {
                 type: 'string',
-                title: 'Value',
+                title: 'Storage Key Path (e.g., user.preferences.theme)',
               },
             },
           },
@@ -902,9 +555,23 @@ export const statePlugin = {
             properties: {
               value: {
                 type: 'string',
-                title: 'Value',
+                title: 'Value to store',
               },
             },
+          },
+          operationType: {
+            type: 'string',
+            title: 'Operation Type',
+            enum: ['set', 'merge', 'append', 'prepend', 'delete'],
+            default: 'set',
+            description: 'set: Set value, merge: Merge objects, append: Add to array end, prepend: Add to array start, delete: Remove key'
+          },
+          mergeStrategy: {
+            type: 'string',
+            title: 'Merge Strategy (for merge operation)',
+            enum: ['shallow', 'deep'],
+            default: 'shallow',
+            description: 'shallow: Simple object merge, deep: Deep merge with nested objects'
           },
         },
         required: ['name', 'payload', 'key'],
@@ -913,34 +580,328 @@ export const statePlugin = {
         try {
           const key = retrieveBody('', process.key.value, event, globalObj, paramState, sessionKey, process);
           const payload = retrieveBody('', process.payload.value, event, globalObj, paramState, sessionKey, process);
-          process?.store.dispatch(
-            process.setSessionInfo({
-              id: sessionKey,
-              key: key,
-              data: payload,
-            })
-          );
-          process?.store.dispatch(process?.refreshAppAuth());
+          const operationType = retrieveBody('', process.operationType, event, globalObj, paramState, sessionKey, process);
+          const mergeStrategy = retrieveBody('', process.mergeStrategy, event, globalObj, paramState, sessionKey, process);
 
-          // process?.store.dispatch(process?.refreshAppAuth());
+          // Utility functions for safe nested operations
+          const safeGet = (obj, path, defaultValue) => {
+            const keys = path.split('.');
+            let result = obj;
+            for (const keyPart of keys) {
+              result = result?.[keyPart];
+              if (result === undefined) return defaultValue;
+            }
+            return result;
+          };
+
+          const safeSet = (obj, path, value) => {
+            const keys = path.split('.');
+            let current = obj;
+            
+            for (let i = 0; i < keys.length - 1; i++) {
+              const keyPart = keys[i];
+              if (!current[keyPart] || typeof current[keyPart] !== 'object') {
+                current[keyPart] = {};
+              }
+              current = current[keyPart];
+            }
+            
+            current[keys[keys.length - 1]] = value;
+          };
+
+          const unset = (obj, path) => {
+            const keys = path.split('.');
+            let current = obj;
+            
+            for (let i = 0; i < keys.length - 1; i++) {
+              current = current?.[keys[i]];
+              if (!current) return;
+            }
+            
+            delete current[keys[keys.length - 1]];
+          };
+
+          const merge = (target, source) => {
+            if (mergeStrategy === 'deep') {
+              return deepMerge(target, source);
+            } else {
+              return { ...target, ...source };
+            }
+          };
+
+          const deepMerge = (target, source) => {
+            const output = { ...target };
+            if (isObject(target) && isObject(source)) {
+              Object.keys(source).forEach(key => {
+                if (isObject(source[key])) {
+                  if (!(key in target)) {
+                    Object.assign(output, { [key]: source[key] });
+                  } else {
+                    output[key] = deepMerge(target[key], source[key]);
+                  }
+                } else {
+                  Object.assign(output, { [key]: source[key] });
+                }
+              });
+            }
+            return output;
+          };
+
+          const isObject = (item) => item && typeof item === 'object' && !Array.isArray(item);
+
+          // Get existing localStorage data
+          const existingData = JSON.parse(localStorage.getItem(sessionKey) || '{}');
+          const currentValue = safeGet(existingData, key);
+
+          // Perform the operation based on type
+          switch (operationType) {
+            case 'set':
+              safeSet(existingData, key, payload);
+              break;
+
+            case 'merge': {
+              const currentObj = currentValue || {};
+              
+              if (typeof currentObj !== 'object' || Array.isArray(currentObj)) {
+                safeSet(existingData, key, payload);
+                break;
+              }
+
+              const mergedValue = merge(currentObj, payload);
+              safeSet(existingData, key, mergedValue);
+              break;
+            }
+
+            case 'append': {
+              const currentArray = currentValue || [];
+              if (Array.isArray(currentArray)) {
+                safeSet(existingData, key, [...currentArray, payload]);
+              } else {
+                safeSet(existingData, key, [payload]);
+              }
+              break;
+            }
+
+            case 'prepend': {
+              const currentArray = currentValue || [];
+              if (Array.isArray(currentArray)) {
+                safeSet(existingData, key, [payload, ...currentArray]);
+              } else {
+                safeSet(existingData, key, [payload]);
+              }
+              break;
+            }
+
+            case 'delete':
+              unset(existingData, key);
+              break;
+
+            default:
+              safeSet(existingData, key, payload);
+          }
+
+          // Save back to localStorage
+          localStorage.setItem(sessionKey, JSON.stringify(existingData));
+
           globalObj[process.name] = {
             data: {
               sessionInfo: {
                 id: sessionKey,
                 key: key,
                 data: payload,
+                operationType: operationType,
+                previousValue: currentValue,
+                newValue: safeGet(existingData, key)
               },
             },
+            success: true,
+            message: `Successfully performed ${operationType} operation on ${key}`
           };
+
         } catch (error) {
-          messageLogger.error('j');
-          console.error(error);
-          messageLogger.error(JSON.stringify(error))
+          messageLogger.error(`LocalStore operation failed: ${error.message}`);
           globalErrors[process.name] = {
             ...globalErrors?.[process.name],
-            ...(error || {
-              error: 'something went wrong',
-            }),
+            error: error.message || 'Local store operation failed',
+            operationType: process.operationType,
+            key: process.key?.value,
+            timestamp: new Date().toISOString(),
+          };
+        }
+      },
+    },
+    {
+      key: 'state-bulkSetSessionInfo',
+      label: 'Bulk Set Local Store',
+      schema: {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            pattern: '^[^.]+$',
+            description: 'No spaces, caps ',
+          },
+          operations: {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Operations Array (JSON string)',
+                description: 'Array of operations: [{"key":"user.name","payload":"John","operation":"set"},{"key":"cache","operation":"delete"}]'
+              },
+            },
+          },
+        },
+        required: ['name', 'operations'],
+      },
+      process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
+        try {
+          const operationsString = retrieveBody('', process.operations.value, event, globalObj, paramState, sessionKey, process);
+          const operations = JSON.parse(operationsString);
+
+          if (!Array.isArray(operations)) {
+            throw new Error('Operations must be an array');
+          }
+
+          // Utility functions for safe nested operations (same as above)
+          const safeGet = (obj, path, defaultValue) => {
+            const keys = path.split('.');
+            let result = obj;
+            for (const keyPart of keys) {
+              result = result?.[keyPart];
+              if (result === undefined) return defaultValue;
+            }
+            return result;
+          };
+
+          const safeSet = (obj, path, value) => {
+            const keys = path.split('.');
+            let current = obj;
+            
+            for (let i = 0; i < keys.length - 1; i++) {
+              const keyPart = keys[i];
+              if (!current[keyPart] || typeof current[keyPart] !== 'object') {
+                current[keyPart] = {};
+              }
+              current = current[keyPart];
+            }
+            
+            current[keys[keys.length - 1]] = value;
+          };
+
+          const unset = (obj, path) => {
+            const keys = path.split('.');
+            let current = obj;
+            
+            for (let i = 0; i < keys.length - 1; i++) {
+              current = current?.[keys[i]];
+              if (!current) return;
+            }
+            
+            delete current[keys[keys.length - 1]];
+          };
+
+          // Get existing localStorage data
+          const existingData = JSON.parse(localStorage.getItem(sessionKey) || '{}');
+          const results = [];
+
+          // Process each operation
+          for (const op of operations) {
+            const { key, payload, operation = 'set' } = op;
+            
+            if (!key) {
+              results.push({ key: 'unknown', operation, success: false, error: 'Key is required' });
+              continue;
+            }
+
+            try {
+              const currentValue = safeGet(existingData, key);
+
+              switch (operation) {
+                case 'set':
+                  safeSet(existingData, key, payload);
+                  break;
+                  
+                case 'merge': {
+                  const currentObj = currentValue || {};
+                  if (typeof currentObj === 'object' && !Array.isArray(currentObj)) {
+                    safeSet(existingData, key, { ...currentObj, ...payload });
+                  } else {
+                    safeSet(existingData, key, payload);
+                  }
+                  break;
+                }
+                  
+                case 'delete':
+                  unset(existingData, key);
+                  break;
+                  
+                case 'append': {
+                  const currentArray = currentValue || [];
+                  if (Array.isArray(currentArray)) {
+                    safeSet(existingData, key, [...currentArray, payload]);
+                  } else {
+                    safeSet(existingData, key, [payload]);
+                  }
+                  break;
+                }
+                  
+                case 'prepend': {
+                  const currentArray = currentValue || [];
+                  if (Array.isArray(currentArray)) {
+                    safeSet(existingData, key, [payload, ...currentArray]);
+                  } else {
+                    safeSet(existingData, key, [payload]);
+                  }
+                  break;
+                }
+                  
+                default:
+                  safeSet(existingData, key, payload);
+              }
+
+              results.push({ 
+                key, 
+                operation, 
+                success: true, 
+                previousValue: currentValue,
+                newValue: safeGet(existingData, key)
+              });
+
+            } catch (opError) {
+              results.push({ 
+                key, 
+                operation, 
+                success: false, 
+                error: opError.message 
+              });
+            }
+          }
+
+          // Save back to localStorage
+          localStorage.setItem(sessionKey, JSON.stringify(existingData));
+
+          globalObj[process.name] = {
+            data: {
+              sessionInfo: {
+                id: sessionKey,
+                operations: results,
+                totalOperations: operations.length,
+                successfulOperations: results.filter(r => r.success).length,
+                failedOperations: results.filter(r => !r.success).length
+              },
+            },
+            success: true,
+            message: `Bulk operation completed: ${results.filter(r => r.success).length}/${operations.length} successful`
+          };
+
+        } catch (error) {
+          messageLogger.error(`Bulk LocalStore operation failed: ${error.message}`);
+          globalErrors[process.name] = {
+            ...globalErrors?.[process.name],
+            error: error.message || 'Bulk local store operation failed',
+            timestamp: new Date().toISOString(),
           };
         }
       },
@@ -962,12 +923,13 @@ export const statePlugin = {
       },
       process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
         try {
-          process?.store.dispatch(
-            process?.setDestroyInfo({
-              id: sessionKey,
-            })
-          );
-          process?.store.dispatch(process?.refreshAppAuth());
+          // process?.store.dispatch(
+          //   process?.setDestroyInfo({
+          //     id: sessionKey,
+          //   })
+          // );
+          localStorage.removeItem(sessionKey);
+          // process?.store.dispatch(process?.refreshAppAuth());
           globalObj[process.name] = {
             data: {},
           };
@@ -1028,31 +990,114 @@ export const statePlugin = {
               },
             },
           },
+          sendAsMultipart: {
+            type: 'boolean',
+            title: 'Send as Multipart',
+            description: 'Enable to send as FormData (multipart/form-data). Disable to send as JSON.',
+            default: false,
+          },
+          filesSource: {
+            type: 'object',
+            title: 'Files Source',
+            properties: {
+
+              value: {
+                type: 'string',
+                title: 'Source Path',
+                description: 'Path to the files source (e.g., target.files for event, or a state path)',
+                default: '{{event.target.files}}',
+              },
+            },
+            description: 'Optional: Specify where to get files from for multipart requests',
+          },
         },
         required: ['name'],
       },
       process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
         try {
+         
           const body = retrieveBody('', process.body?.value, event, globalObj, paramState, sessionKey, process);
           const headers = retrieveBody('', process.headers?.value, event, globalObj, paramState, sessionKey, process);
+
+
+
+          let requestData;
+          let files = null;
+          
+          // Get files from the specified source (only if multipart is enabled)
+          if (process.sendAsMultipart && process.filesSource?.value) {
+            try {
+              files = retrieveBody(
+                process.filesSource.from || 'event',
+                process.filesSource.value,
+                event,
+                globalObj,
+                paramState,
+                sessionKey,
+                process
+              );
+            } catch (error) {
+              
+            }
+          }
+          
+          // Check if we should send as multipart (based on checkbox, not automatic file detection)
+          if (process.sendAsMultipart) {
+           
+            // Create FormData for multipart request
+            requestData = new FormData();
+            
+            // Add each body property as individual form fields
+            if (body && typeof body === 'object') {
+              Object.keys(body).forEach(key => {
+                requestData.append(key, body[key]);
+              });
+            }
+            
+            // Add files if available
+            if (files) {
+              const fileArray = Array.isArray(files) ? files : Array.from(files || []);
+              fileArray.forEach((fileItem: any, index) => {
+                if (fileItem.originFileObj) {
+                  // Ant Design file object
+                  requestData.append(`files`, fileItem.originFileObj, fileItem.name);
+                } else if (fileItem instanceof File) {
+                  // Native File object
+                  requestData.append(`files`, fileItem, fileItem.name);
+                }
+              });
+            }
+
+          } else {
+            // Regular JSON request (default behavior)
+            requestData = body;
+          }
+    
+
+
+
+
+
           const res = await process?.storeInvocation(
-            body,
+            requestData,
             appId,
             process.controller,
             process?.componentId,
             process?.viewId,
-            headers
+            headers,
+            import.meta.env.VITE_ISDEPLOYED ? 'production' : 'development'
           );
+
           if (Object.keys(res.data?.errors || {})?.length > 0) {
-            messageLogger.error(JSON.stringify(res.data.errors, null, 2));
+            messageLogger.error(JSON.stringify(res.data?.errors, null, 2));
           }
           globalObj[process.name] = process?.returnKey
-            ? getValueByPath(res.data.data, process?.returnKey)
+            ? getValueByPath(res.data, process?.returnKey)
             : {
-              ...res.data.data,
+              ...res.data,
             };
         } catch (error) {
-          console.error(error);
+          console.error(error)
           // messageLogger.error('err ');
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {
@@ -1422,7 +1467,7 @@ export const statePlugin = {
       if (typeof message !== 'undefined' && messageLogger.error) {
         messageLogger.error(`WebSocket connection failed: ${error.message}`);
       } else {
-        console.error('[ERROR] WebSocket connection failed:', error.message);
+        
       }
 
       // Re-throw to ensure calling code knows about the failure
@@ -1500,7 +1545,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -1705,7 +1750,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -2037,7 +2082,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -2387,7 +2432,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -2557,7 +2602,7 @@ export const statePlugin = {
       };
 
       // Log error
-      console.error('[ERROR] Interval setup failed:', error.message);
+      
       throw error;
     }
   }
@@ -2647,7 +2692,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -2893,7 +2938,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -3051,7 +3096,7 @@ export const statePlugin = {
         timestamp: new Date().toISOString()
       };
 
-      console.error('[ERROR] Timeout setup failed:', error.message);
+      
       throw error;
     }
   }
@@ -3148,7 +3193,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -3387,7 +3432,7 @@ export const statePlugin = {
           if (typeof message !== 'undefined' && messageLogger.warning) {
             messageLogger.warning(text);
           } else {
-            console.warn('[WARN]', text);
+            
           }
         }
       };
@@ -4281,7 +4326,7 @@ export const statePlugin = {
                   process.pageId, process.editMode, process.store, process?.refreshAppAuth,
                   process?.setDestroyInfo, process.setSessionInfo, process?.setAppStatePartial, () => '');
               } catch (handlerError) {
-                console.error('Event handler error:', handlerError);
+                
               }
             }
           };
@@ -4854,7 +4899,7 @@ export const statePlugin = {
 
       // Log error
       messageLogger.error(`${process.actionType} action failed: ${error.message}`);
-      console.error('Window/DOM Action Error:', errorDetails);
+      
 
       // Re-throw to maintain error propagation
       throw error;
@@ -5795,7 +5840,7 @@ export const statePlugin = {
             process.controller,
             process?.componentId,
             process?.viewId,
-            process?.headers,'development'
+            process?.headers, 'development'
           );
           if (Object.keys(res.data.errors).length > 0) {
             // messageLogger.error(JSON.stringify(res.data.errors, null, 2));
@@ -5976,6 +6021,10 @@ export const statePlugin = {
           if (process.editMode) {
             return
           }
+          
+          // Prevent double navigation by stopping event propagation
+          // Only prevent default and stop propagation if not explicitly disabled in the process configuration
+
           // messageLogger.info(process.compId);
           const currentParams = process?.keepCurrentQueryParams
             ? new URLSearchParams(window.location.search)
@@ -6005,7 +6054,9 @@ export const statePlugin = {
           let baseUrl = '';
           if (import.meta.env.VITE_ISDEPLOYED) {
             baseUrl = `/${process?.pageToNavigate}`;
+
           } else {
+            
             baseUrl = `/applications/${appId}/views/${process?.pageToNavigate}`;
           }
 
@@ -6015,10 +6066,15 @@ export const statePlugin = {
           if (process.isExternalPath) {
             window.location.href = process?.pageToNavigate;
           } else if (!process.editMode) {
-            (process)
-            navigate(fullUrl);
+            // Debounce navigation to prevent double calls
+            if (!globalObj._lastNavigation || Date.now() - globalObj._lastNavigation > 300) {
+              globalObj._lastNavigation = Date.now();
+              navigate(fullUrl);
+             
+            }
           } else if (process.editMode) {
-            // messageLogger.info('Tried to navigate to ' + process?.pageToNavigate)
+            // navigate(fullUrl);
+            messageLogger.info('Tried to navigate to ' + process?.pageToNavigate)
           }
           globalObj[process.name] = {
             data: {
@@ -6071,7 +6127,7 @@ export const statePlugin = {
             },
           };
         } catch (error) {
-          console.error('Failed to copy URL to clipboard: ', error);
+          
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {
             ...globalErrors?.[process.name],
@@ -6132,7 +6188,7 @@ export const statePlugin = {
           logJsonDebug(globalObj, paramState, event, sessionKey, getUrlDetails, process);
           // messageLogger.info('kkkk');
         } catch (error) {
-          console.error('Failed to copy URL to clipboard: ', error);
+          
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {
             ...globalErrors?.[process.name],
@@ -6193,7 +6249,7 @@ export const statePlugin = {
             },
           };
         } catch (error) {
-          console.error('Failed to copy URL to clipboard: ', error);
+          
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {
             ...globalErrors?.[process.name],
@@ -6253,7 +6309,7 @@ export const statePlugin = {
             ...data?.data,
           };
         } catch (error) {
-          console.error('Failed to copy URL to clipboard: ', error);
+          
           messageLogger.error(JSON.stringify(error))
           globalErrors[process.name] = {
             ...globalErrors?.[process.name],
@@ -6262,13 +6318,253 @@ export const statePlugin = {
         }
       },
     },
+    {
+      key: 'trigger-element-event',
+      label: 'Trigger Element Event',
+      schema: {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            title: 'Name',
+            pattern: '^[^.]+$',
+            description: 'Operation name (no spaces, dots)',
+          },
+          targetElementId: {
+            type: 'string',
+            title: 'Target Element ID',
+            config: {
+              uiType: 'elementSelect',
+            },
+        
+          },
+          eventType: {
+            type: 'string',
+            title: 'Event Type',
+            enum: [
+              // Mouse Events
+              'click', 'dblclick', 'mousedown', 'mouseup', 'mouseover', 'mouseout',
+              'mousemove', 'mouseenter', 'mouseleave', 'contextmenu', 'wheel',
+              // Keyboard Events
+              'keydown', 'keyup', 'keypress',
+              // Form Events
+              'submit', 'reset', 'change', 'input', 'focus', 'blur', 'select',
+              // Drag Events
+              'drag', 'dragstart', 'dragend', 'dragover', 'dragenter', 'dragleave', 'drop',
+              // Touch Events (for mobile)
+              'touchstart', 'touchend', 'touchmove', 'touchcancel',
+              // Animation Events
+              'animationstart', 'animationend', 'animationiteration',
+              // Transition Events
+              'transitionstart', 'transitionend', 'transitionrun', 'transitioncancel',
+              // Media Events
+              'play', 'pause', 'ended', 'volumechange', 'loadstart', 'loadeddata',
+              'loadedmetadata', 'canplay', 'canplaythrough', 'seeking', 'seeked',
+              // Clipboard Events
+              'copy', 'cut', 'paste',
+              // Window/Document Events
+              'load', 'unload', 'beforeunload', 'resize', 'scroll',
+              // Other Common Events
+              'error', 'abort', 'toggle', 'invalid'
+            ],
+            default: 'click',
+            description: 'Type of event to trigger on the target element',
+          },
+          eventData: {
+            type: 'object',
+            title: 'Event Data (Optional)',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Event Data',
+                description: 'Optional data to pass with the event (JSON string)',
+              },
+            },
+          },
+          bubbles: {
+            type: 'boolean',
+            title: 'Bubbles',
+            default: true,
+            description: 'Whether the event should bubble up the DOM tree',
+          },
+          cancelable: {
+            type: 'boolean',
+            title: 'Cancelable',
+            default: true,
+            description: 'Whether the event can be canceled',
+          },
+        },
+        required: ['name', 'targetElementId', 'eventType'],
+      },
+      process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
+        try {
+          // Get the target element ID
+          const elementId = process.targetElementId;
+
+          // Get optional event data
+          let eventData = null;
+          if (process.eventData?.value) {
+            const rawEventData = retrieveBody(
+              process.eventData.from || 'static',
+              process.eventData.value,
+              event,
+              globalObj,
+              paramState,
+              sessionKey
+            );
+            try {
+              eventData = typeof rawEventData === 'string' ? JSON.parse(rawEventData) : rawEventData;
+            } catch (e) {
+              
+              eventData = rawEventData;
+            }
+          }
+
+          // Find the target element
+          const targetElement = document.getElementById(elementId);
+          
+          if (!targetElement) {
+            throw new Error(`Element with ID '${elementId}' not found`);
+          }
+
+          const eventType = process.eventType || 'click';
+          const bubbles = process.bubbles !== false; // Default to true
+          const cancelable = process.cancelable !== false; // Default to true
+
+          // Create and dispatch the appropriate event
+          let customEvent;
+
+          // Handle different event categories
+          if (['click', 'dblclick', 'mousedown', 'mouseup', 'mouseover', 'mouseout', 'mousemove', 'mouseenter', 'mouseleave', 'contextmenu'].includes(eventType)) {
+            // Mouse events
+            customEvent = new MouseEvent(eventType, {
+              bubbles,
+              cancelable,
+              view: window,
+              detail: eventData?.detail || 1,
+              screenX: eventData?.screenX || 0,
+              screenY: eventData?.screenY || 0,
+              clientX: eventData?.clientX || 0,
+              clientY: eventData?.clientY || 0,
+              ctrlKey: eventData?.ctrlKey || false,
+              altKey: eventData?.altKey || false,
+              shiftKey: eventData?.shiftKey || false,
+              metaKey: eventData?.metaKey || false,
+              button: eventData?.button || 0,
+            });
+          } else if (['keydown', 'keyup', 'keypress'].includes(eventType)) {
+            // Keyboard events
+            customEvent = new KeyboardEvent(eventType, {
+              bubbles,
+              cancelable,
+              view: window,
+              key: eventData?.key || '',
+              code: eventData?.code || '',
+              location: eventData?.location || 0,
+              ctrlKey: eventData?.ctrlKey || false,
+              altKey: eventData?.altKey || false,
+              shiftKey: eventData?.shiftKey || false,
+              metaKey: eventData?.metaKey || false,
+              repeat: eventData?.repeat || false,
+            });
+          } else if (['touchstart', 'touchend', 'touchmove', 'touchcancel'].includes(eventType)) {
+            // Touch events
+            customEvent = new TouchEvent(eventType, {
+              bubbles,
+              cancelable,
+              view: window,
+              touches: eventData?.touches || [],
+              targetTouches: eventData?.targetTouches || [],
+              changedTouches: eventData?.changedTouches || [],
+              ctrlKey: eventData?.ctrlKey || false,
+              altKey: eventData?.altKey || false,
+              shiftKey: eventData?.shiftKey || false,
+              metaKey: eventData?.metaKey || false,
+            });
+          } else if (['drag', 'dragstart', 'dragend', 'dragover', 'dragenter', 'dragleave', 'drop'].includes(eventType)) {
+            // Drag events
+            customEvent = new DragEvent(eventType, {
+              bubbles,
+              cancelable,
+              view: window,
+              detail: eventData?.detail || 0,
+              dataTransfer: eventData?.dataTransfer || null,
+            });
+          } else if (['animationstart', 'animationend', 'animationiteration'].includes(eventType)) {
+            // Animation events
+            customEvent = new AnimationEvent(eventType, {
+              bubbles,
+              cancelable,
+              animationName: eventData?.animationName || '',
+              elapsedTime: eventData?.elapsedTime || 0,
+              pseudoElement: eventData?.pseudoElement || '',
+            });
+          } else if (['transitionstart', 'transitionend', 'transitionrun', 'transitioncancel'].includes(eventType)) {
+            // Transition events
+            customEvent = new TransitionEvent(eventType, {
+              bubbles,
+              cancelable,
+              propertyName: eventData?.propertyName || '',
+              elapsedTime: eventData?.elapsedTime || 0,
+              pseudoElement: eventData?.pseudoElement || '',
+            });
+          } else if (['wheel'].includes(eventType)) {
+            // Wheel events
+            customEvent = new WheelEvent(eventType, {
+              bubbles,
+              cancelable,
+              view: window,
+              deltaX: eventData?.deltaX || 0,
+              deltaY: eventData?.deltaY || 0,
+              deltaZ: eventData?.deltaZ || 0,
+              deltaMode: eventData?.deltaMode || 0,
+            });
+          } else {
+            // Generic events (including form events, clipboard events, etc.)
+            customEvent = new CustomEvent(eventType, {
+              bubbles,
+              cancelable,
+              detail: eventData || null,
+            });
+          }
+
+          // Dispatch the event
+          const result = targetElement.dispatchEvent(customEvent);
+
+          // Store result in global object
+          globalObj[process.name] = {
+            success: true,
+            elementId: elementId,
+            eventType: eventType,
+            eventDispatched: true,
+            eventNotCanceled: result, // true if event was not canceled
+            timestamp: new Date().toISOString(),
+            eventData: eventData,
+          };
+
+
+          messageLogger.success(`Event '${eventType}' triggered on element '${elementId}'`);
+
+        } catch (error) {
+          
+          messageLogger.error(`Failed to trigger element event: ${error.message}`);
+          
+          globalErrors[process.name] = {
+            ...globalErrors?.[process.name],
+            error: error?.message || 'Failed to trigger element event',
+            timestamp: new Date().toISOString(),
+          };
+        }
+      },
+    },
   ],
 };
-export function generateObject(array, event, globalObj, paramState, sessionKey) {
+export function generateObject(array, event, globalObj, paramState, sessionKey, process) {
   const result = {};
   array.forEach((item) => {
-    const key = retrieveBody(item.key.from, item.key.value, event, globalObj, paramState, sessionKey) || {};
-    const value = retrieveBody(item.value.from, item.value.value, event, globalObj, paramState, sessionKey) || {};
+    const key = retrieveBody(item.key.from, item.key.value, event, globalObj, paramState, sessionKey, process) || {};
+    const value = retrieveBody(item.value.from, item.value.value, event, globalObj, paramState, sessionKey, process) || {};
     result[key] = value;
   });
   return result;

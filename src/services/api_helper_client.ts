@@ -81,7 +81,7 @@ export async function post2(url, data, config = {}) {
       const res = await axiosApi.post(API_URL + url, data, config);
       return resolve(res);
     } catch (err) {
-      console.log(err);
+ 
       const errors = err.response?.data?.error?.message;
       const errorArray = errors?.split(',');
       return reject(errorArray);

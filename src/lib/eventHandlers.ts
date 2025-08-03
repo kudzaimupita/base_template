@@ -3,13 +3,39 @@ export const genericEventHandlers = {
   type: 'object',
   description: 'Comprehensive event handlers for all possible interactions in React',
   properties: {
-    // Mouse Events
+    // Most Common Events - moved to top for easier access
     onClick: {
       type: 'string',
       title: 'On Click',
       description: 'Triggered when an element is clicked',
       config: { uiType: 'eventHandler' },
     },
+    onChange: {
+      type: 'string',
+      title: 'On Change',
+      description: 'Triggered when the value of an input element changes',
+      config: { uiType: 'eventHandler' },
+    },
+    onSubmit: {
+      type: 'string',
+      title: 'On Submit',
+      description: 'Triggered when a form is submitted',
+      config: { uiType: 'eventHandler' },
+    },
+    onFocus: {
+      type: 'string',
+      title: 'On Focus',
+      description: 'Fires when an element receives focus',
+      config: { uiType: 'eventHandler' },
+    },
+    onBlur: {
+      type: 'string',
+      title: 'On Blur',
+      description: 'Triggered when an element loses focus',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Mouse Events
     onDoubleClick: {
       type: 'string',
       title: 'On Double Click',
@@ -86,34 +112,10 @@ export const genericEventHandlers = {
     },
 
     // Form Events
-    onChange: {
-      type: 'string',
-      title: 'On Change',
-      description: 'Triggered when the value of an input element changes',
-      config: { uiType: 'eventHandler' },
-    },
     onInput: {
       type: 'string',
       title: 'On Input',
       description: 'Fires immediately when an input value changes',
-      config: { uiType: 'eventHandler' },
-    },
-    onSubmit: {
-      type: 'string',
-      title: 'On Submit',
-      description: 'Triggered when a form is submitted',
-      config: { uiType: 'eventHandler' },
-    },
-    onFocus: {
-      type: 'string',
-      title: 'On Focus',
-      description: 'Fires when an element receives focus',
-      config: { uiType: 'eventHandler' },
-    },
-    onBlur: {
-      type: 'string',
-      title: 'On Blur',
-      description: 'Triggered when an element loses focus',
       config: { uiType: 'eventHandler' },
     },
     onReset: {

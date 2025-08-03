@@ -26,6 +26,7 @@ const InlineEditText: React.FC<IInlineEditText> = ({
   isInlineTextFocused,
   onType,
   isEditable = true,
+  id
 }) => {
   const [text, setText] = useState(initialText);
   const [isEditing, setIsEditing] = useState(false);
@@ -168,14 +169,16 @@ const InlineEditText: React.FC<IInlineEditText> = ({
   if (!isEditing) {
     return (
       <p
+
         {...sharedProps}
-        className={`  ${baseStyles}`}
+        className={`noDrag  ${baseStyles}`}
         style={{
           // fontSize: '14px',
           textDecoration: underLineOnHover && isHover ? 'underline' : '',
           ...customStyles,
           ...overRideStyles,
         }}
+        // id={id}
         onDoubleClick={handleDoubleClick}
       >
         {text}
