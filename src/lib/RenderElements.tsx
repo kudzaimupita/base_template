@@ -154,7 +154,7 @@ const ElementItem = React.memo(({
     }
     
     // Use a more conservative approach without requestAnimationFrame to avoid timing conflicts
-    setElements(currentElements => {
+    setElements?.(currentElements => {
       const elementsMap = new Map(currentElements.map(el => [el.i, el]));
       let hasChanges = false;
 
@@ -787,7 +787,7 @@ const ElementRenderer = React.memo(({
       setIsClearing(true);
       
       const performTabChange = () => {
-        setElements(currentElements => {
+        setElements?.(currentElements => {
           const filteredElements = currentElements.filter(el => {
             if (el.tab && el.tab !== tab) return false;
             if (el.isVirtual && el.sourceTab && el.sourceTab !== tab) return false;

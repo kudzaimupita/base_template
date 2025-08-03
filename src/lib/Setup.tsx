@@ -199,7 +199,7 @@ export const SortableContainerSetup = ({
                                 setTimeout(() => {
                                     try {
                                         if (setElements && typeof setElements === 'function') {
-                                            setElements(currentElements => {
+                                            setElements?.(currentElements => {
                                                 try {
                                                     if (!Array.isArray(currentElements)) {
                                                         return currentElements || [];
