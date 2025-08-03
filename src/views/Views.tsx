@@ -52,7 +52,7 @@ const Views = () => {
   const defaultPage = getDefaultPage(appConfig);
   const appState = useSelector((state) => state.appState);
   return (
-    <Suspense fallback={<div className="flex flex-auto flex-col h-[100vh]">{/* <ModernSpinner /> */}</div>}>
+    <Suspense fallback={<div className="bg-transparent">{/* <ModernSpinner /> */}</div>}>
       <ConfigProvider
         theme={{
           components: {},
