@@ -1,6 +1,6 @@
 import { del, get, patch, post, post2 } from './api_helper_client';
 
-import ApiService from './GenericApiService';
+// import ApiService from './GenericApiService';
 
 export const getInvocations = () => {
   return new Promise((resolve, reject) => {
@@ -18,12 +18,7 @@ export const getSettings = () => {
   });
 };
 
-export async function getInvocation(id: any) {
-  return ApiService.fetchData({
-    url: `/invocations/${id}`,
-    method: 'get',
-  });
-}
+
 export const checkout = (body: any) => {
   return new Promise((resolve, reject) => {
     post(`/invocations/checkout`, body)
@@ -124,13 +119,7 @@ export const deleteInvocation = (id: any) => {
   });
 };
 
-export async function getNewInvocations(params: any) {
-  return ApiService.fetchData({
-    url: '/invocations',
-    method: 'get',
-    params,
-  });
-}
+
 
 
 export const deleteInvocations = (formData: any) => {
