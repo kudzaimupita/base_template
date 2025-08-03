@@ -153,9 +153,6 @@ import {
   Layer
 } from 'recharts';
 
-import Chart from '../../../../../components/shared/Chart';
-import { Tooltip } from '../../../../../components/shadcn/tooltip';
-
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -310,16 +307,7 @@ const MyComponent = React.memo((props: any) => {
   // Add ApexCharts components with Apex prefix
   const ApexComponents = useMemo(
     () => ({
-      ApexLineChart: (props) => <Chart {...props} type="line" />,
-      ApexBarChart: (props) => <Chart {...props} type="bar" />,
-      ApexAreaChart: (props) => <Chart {...props} type="area" />,
-      ApexDonutChart: (props) => <Chart {...props} type="donut" />,
-      ApexPieChart: (props) => <Chart {...props} type="donut" customOptions={{...props.customOptions, plotOptions: {pie: {donut: {size: "0%"}}}}} />,
-      ApexRadialChart: (props) => <Chart {...props} type="donut" customOptions={{...props.customOptions, chart: {type: "radialBar"}}} />,
-      ApexMixedChart: (props) => <Chart {...props} type="line" />,
-      ApexSparklineChart: (props) => <Chart {...props} type="line" customOptions={{...props.customOptions, chart: {sparkline: {enabled: true}}}} />,
-      ApexHeatmapChart: (props) => <Chart {...props} type="line" customOptions={{...props.customOptions, chart: {type: "heatmap"}}} />,
-      ApexScatterChart: (props) => <Chart {...props} type="line" customOptions={{...props.customOptions, chart: {type: "scatter"}}} />,
+
     }),
     []
   );
@@ -3586,7 +3574,7 @@ const MyComponent = React.memo((props: any) => {
                     ...NivoComponents,
                     ...ChartJSComponents,
                     AntSchemaForm: FormSc,
-                    Chart: Chart,
+                   
                     ...ExternalComponents,
                   }}
                   blacklistedAttrs={[]}
