@@ -6,10 +6,29 @@ import merge from 'lodash/merge';
 import cloneDeep from 'lodash/cloneDeep';
 import unset from 'lodash/unset';
 
-// Define payload interfaces
 interface SetStatePartialPayload {
   key: string;
   payload: any;
+  operationType?: 'set' | 'merge' | 'spread' | 'append' | 'prepend' | 'delete' | 'toggle' | 'increment' | 'decrement' | 'bulk' | 'concat' | 'stringAppend' | 'stringPrepend' | 'stringRemove';
+  operationConfig?: {
+    mergeStrategy?: 'shallow' | 'deep' | 'replace';
+    spreadProperties?: string[];
+    arrayOperation?: 'push' | 'unshift' | 'pop' | 'shift' | 'splice' | 'filter' | 'map' | 'sort';
+    arrayIndex?: number;
+    deleteCount?: number;
+    condition?: string | ((currentValue: any, state: any) => boolean);
+    transform?: (currentValue: any, state: any) => any;
+    separator?: string; // For string operations
+  };
+  elementContext?: {
+    elementId: string;
+    elementConfiguration?: any;
+    allElements?: any[];
+    viewId?: string;
+    pageId?: string;
+    compId?: string;
+    completeElement?: any;
+  };
 }
 
 interface BulkStateUpdate {
@@ -43,20 +62,18 @@ interface TransformUpdatePayload {
   transform: (currentValue: any, state: any) => any;
 }
 
-// Define state interface
 interface AppState {
   [key: string]: any;
 }
 
 const initialState = {} as AppState;
 
-// Helper functions
 const safeGet = (state: any, path: string, defaultValue: any = undefined) => {
   try {
     return get(state, path, defaultValue);
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn(`Error getting path ${path}:`, error);
+      
     }
     return defaultValue;
   }
@@ -68,7 +85,7 @@ const safeSet = (state: any, path: string, value: any) => {
     return true;
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
-      console.error(`Error setting path ${path}:`, error);
+      
     }
     return false;
   }
@@ -89,7 +106,7 @@ const evaluateCondition = (condition: string | Function, currentValue: any, stat
     return true;
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn('Condition evaluation failed:', error);
+      
     }
     return false;
   }
@@ -99,10 +116,10 @@ const appStateSlice = createSlice({
   name: 'appState',
   initialState,
   reducers: {
-    // Basic set operation using lodash's optimized set function
+    // Enhanced setAppStatePartial to handle all operation types
     setAppStatePartial: (state, action: PayloadAction<SetStatePartialPayload>) => {
-      const { key, payload } = action.payload;
-      
+      const { key, payload, operationType = 'set', operationConfig = {} } = action.payload;
+     
       if (!key) {
         if (process.env.NODE_ENV !== 'production') {
           console.warn('setAppStatePartial: key is required');
@@ -110,7 +127,337 @@ const appStateSlice = createSlice({
         return;
       }
 
-      safeSet(state, key, payload);
+      const currentValue = safeGet(state, key);
+      let finalPayload = payload;
+
+      try {
+        switch (operationType) {
+          case 'set':
+            safeSet(state, key, finalPayload);
+            break;
+
+          case 'merge': {
+            const { mergeStrategy = 'shallow' } = operationConfig;
+            const currentObj = currentValue || {};
+            
+            if (typeof currentObj !== 'object' || Array.isArray(currentObj)) {
+              safeSet(state, key, finalPayload);
+              return;
+            }
+
+            let mergedValue;
+            switch (mergeStrategy) {
+              case 'deep':
+                mergedValue = merge(cloneDeep(currentObj), cloneDeep(finalPayload));
+                break;
+              case 'shallow':
+                mergedValue = { ...currentObj, ...finalPayload };
+                break;
+              case 'replace':
+              default:
+                mergedValue = finalPayload;
+                break;
+            }
+            safeSet(state, key, mergedValue);
+            break;
+          }
+
+          case 'spread': {
+            const { spreadProperties } = operationConfig;
+            
+            // Handle different data types for spread
+            if (typeof currentValue === 'string' && typeof finalPayload === 'string') {
+              // String concatenation for strings
+              finalPayload = currentValue + finalPayload;
+            } else if (Array.isArray(currentValue) && Array.isArray(finalPayload)) {
+              // Array spread
+              finalPayload = [...currentValue, ...finalPayload];
+            } else {
+              // Object spread (original behavior)
+              const sourceObj = finalPayload || {};
+              const targetObj = currentValue || {};
+              
+              let spreadData: any = {};
+              if (Array.isArray(spreadProperties) && spreadProperties.length > 0) {
+                // Spread only specific properties
+                spreadProperties.forEach(prop => {
+                  if (Object.prototype.hasOwnProperty.call(sourceObj, prop)) {
+                    spreadData[prop] = (sourceObj as any)[prop];
+                  }
+                });
+              } else {
+                // Spread all properties
+                spreadData = { ...sourceObj };
+              }
+              
+              finalPayload = { ...targetObj, ...spreadData };
+            }
+            
+            safeSet(state, key, finalPayload);
+            break;
+          }
+
+          case 'append':
+          case 'prepend': {
+            const currentArray = Array.isArray(currentValue) ? currentValue : [];
+            if (operationType === 'append') {
+              finalPayload = [...currentArray, finalPayload];
+            } else {
+              finalPayload = [finalPayload, ...currentArray];
+            }
+            safeSet(state, key, finalPayload);
+            break;
+          }
+
+          case 'delete':
+            unset(state, key);
+            break;
+
+          case 'toggle':
+            finalPayload = !currentValue;
+            safeSet(state, key, finalPayload);
+            break;
+
+          case 'increment': {
+            const currentNum = typeof currentValue === 'number' ? currentValue : 0;
+            const incrementBy = typeof finalPayload === 'number' ? finalPayload : 1;
+            finalPayload = currentNum + incrementBy;
+            safeSet(state, key, finalPayload);
+            break;
+          }
+
+          case 'decrement': {
+            const currentNumDec = typeof currentValue === 'number' ? currentValue : 0;
+            const decrementBy = typeof finalPayload === 'number' ? finalPayload : 1;
+            finalPayload = currentNumDec - decrementBy;
+            safeSet(state, key, finalPayload);
+            break;
+          }
+
+          case 'bulk':
+            // Handle bulk operations as array of operations
+            if (Array.isArray(finalPayload)) {
+              finalPayload.forEach(operation => {
+                if (operation.key) {
+                  const operationPayload = {
+                    key: operation.key,
+                    payload: operation.payload,
+                    operationType: operation.operation || 'set',
+                    operationConfig: operation.config || {}
+                  };
+                  // Recursively call this reducer for each bulk operation
+                  appStateSlice.caseReducers.setAppStatePartial(state, {
+                    ...action,
+                    payload: operationPayload
+                  });
+                }
+              });
+            }
+            break;
+
+          case 'concat':
+          case 'stringAppend': {
+            // Concatenate strings with optional separator
+            const { separator = '' } = operationConfig;
+            const currentStr = typeof currentValue === 'string' ? currentValue : '';
+            const appendStr = typeof finalPayload === 'string' ? finalPayload : String(finalPayload);
+            
+            // Get element configuration context if available
+            const { elementContext } = action.payload;
+            if (elementContext?.elementId && elementContext?.elementConfiguration) {
+              // Check if we're working with a configuration property like className
+              const currentConfigValue = get(elementContext.elementConfiguration, key.split('.').slice(1).join('.')) || '';
+              if (typeof currentConfigValue === 'string') {
+                finalPayload = currentConfigValue + separator + appendStr;
+              } else {
+                finalPayload = currentStr + separator + appendStr;
+              }
+            } else {
+              finalPayload = currentStr + separator + appendStr;
+            }
+            
+            safeSet(state, key, finalPayload);
+            break;
+          }
+
+          case 'stringPrepend': {
+            // Prepend to strings with optional separator
+            const { separator = '' } = operationConfig;
+            const currentStr = typeof currentValue === 'string' ? currentValue : '';
+            const prependStr = typeof finalPayload === 'string' ? finalPayload : String(finalPayload);
+            
+            // Get element configuration context if available
+            const { elementContext } = action.payload;
+            if (elementContext?.elementId && elementContext?.elementConfiguration) {
+              // Check if we're working with a configuration property like className
+              const currentConfigValue = get(elementContext.elementConfiguration, key.split('.').slice(1).join('.')) || '';
+              if (typeof currentConfigValue === 'string') {
+                finalPayload = prependStr + separator + currentConfigValue;
+              } else {
+                finalPayload = prependStr + separator + currentStr;
+              }
+            } else {
+              finalPayload = prependStr + separator + currentStr;
+            }
+            
+            safeSet(state, key, finalPayload);
+            break;
+          }
+
+          case 'stringRemove': {
+            // Remove specific text/classes from strings (supports multiple values)
+            const { separator = ' ' } = operationConfig;
+            const removeStr = typeof finalPayload === 'string' ? finalPayload : String(finalPayload);
+            
+            // Get element configuration context if available
+            const { elementContext } = action.payload;
+            let targetString = '';
+            
+            // Use element configuration passed from actions (via store.getState())
+            if (elementContext?.elementConfiguration) {
+              // Extract property name from key
+              const keyParts = key.split('.');
+              const propertyName = keyParts[keyParts.length - 1];
+              
+              // Try multiple possible paths in element configuration
+              const possiblePaths = [
+                propertyName,
+                `configuration.${propertyName}`,
+                keyParts.slice(1).join('.'),
+              ];
+              
+              for (const path of possiblePaths) {
+                const configValue = get(elementContext.elementConfiguration, path);
+                if (typeof configValue === 'string') {
+                  targetString = configValue;
+                  console.log('Found targetString via elementConfiguration path:', path, '=', configValue);
+                  break;
+                }
+              }
+            }
+            
+            // Fallback strategies
+            if (!targetString) {
+              if (typeof currentValue === 'string') {
+                targetString = currentValue;
+                console.log('Using currentValue as targetString:', currentValue);
+              } else {
+                const stateValue = get(state, key);
+                targetString = typeof stateValue === 'string' ? stateValue : '';
+                console.log('Using state value as targetString:', stateValue);
+              }
+            }
+            
+            console.log('StringRemove Debug (using store.getState()):', {
+              key,
+              targetString,
+              removeStr,
+              currentValue,
+              elementContext: !!elementContext,
+              elementId: elementContext?.elementId,
+              viewId: elementContext?.viewId,
+              hasElementConfig: !!elementContext?.elementConfiguration,
+              elementConfigKeys: elementContext?.elementConfiguration ? Object.keys(elementContext.elementConfiguration) : 'none'
+            });
+            
+            // Skip if nothing to remove or no target string
+            if (!removeStr?.trim() || !targetString?.trim()) {
+              console.log('StringRemove: Skipping - no removeStr or targetString');
+              break;
+            }
+            
+            // Split the removeStr to get multiple values to remove
+            const removeValues = removeStr.split(separator)
+              .map(val => val.trim())
+              .filter(val => val !== '');
+            
+            // Split target string by separator, remove all matching items, and rejoin
+            const parts = targetString.split(separator).filter(part => {
+              const trimmedPart = part.trim();
+              return trimmedPart !== '' && !removeValues.includes(trimmedPart);
+            });
+            
+            finalPayload = parts.join(separator).replace(/\s+/g, ' ').trim();
+            
+            console.log('StringRemove Result:', {
+              before: targetString,
+              after: finalPayload,
+              removed: removeValues
+            });
+            
+            safeSet(state, key, finalPayload);
+            break;
+          }
+
+          default: {
+            // Handle array operations if specified
+            const { arrayOperation, arrayIndex = -1, deleteCount = 1 } = operationConfig;
+            
+            if (arrayOperation && Array.isArray(currentValue)) {
+              let newArray = [...currentValue];
+              
+              switch (arrayOperation) {
+                case 'push':
+                  newArray.push(finalPayload);
+                  break;
+                case 'unshift':
+                  newArray.unshift(finalPayload);
+                  break;
+                case 'pop':
+                  newArray.pop();
+                  break;
+                case 'shift':
+                  newArray.shift();
+                  break;
+                case 'splice':
+                  if (arrayIndex >= 0) {
+                    newArray.splice(arrayIndex, deleteCount, finalPayload);
+                  }
+                  break;
+                                 case 'filter':
+                   if (typeof finalPayload === 'string') {
+                     const filterFunc = new Function('item', 'index', 'array', `return ${finalPayload}`) as any;
+                     newArray = newArray.filter(filterFunc);
+                   }
+                   break;
+                 case 'map':
+                   if (typeof finalPayload === 'string') {
+                     const mapFunc = new Function('item', 'index', 'array', `return ${finalPayload}`) as any;
+                     newArray = newArray.map(mapFunc);
+                   }
+                   break;
+                 case 'sort':
+                   if (typeof finalPayload === 'string') {
+                     const compareFunc = new Function('a', 'b', `return ${finalPayload}`) as any;
+                     newArray.sort(compareFunc);
+                   } else {
+                     newArray.sort();
+                   }
+                   break;
+              }
+              
+              finalPayload = newArray;
+              safeSet(state, key, finalPayload);
+            } else {
+              // Default to set operation
+              safeSet(state, key, finalPayload);
+            }
+            break;
+          }
+        }
+
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`State operation '${operationType}' completed for key: ${key}`, { 
+            previousValue: currentValue, 
+            newValue: finalPayload 
+          });
+        }
+
+               } catch (error: any) {
+           if (process.env.NODE_ENV !== 'production') {
+             console.error(`State operation '${operationType}' failed for key: ${key}`, error);
+           }
+         }
     },
 
     // Advanced merge operations
@@ -151,7 +498,7 @@ const appStateSlice = createSlice({
       
       if (!Array.isArray(updates)) {
         if (process.env.NODE_ENV !== 'production') {
-          console.warn('bulkSetAppState: payload must be an array');
+          
         }
         return;
       }
@@ -167,7 +514,7 @@ const appStateSlice = createSlice({
               safeSet(state, key, payload);
               break;
               
-            case 'merge':
+            case 'merge': {
               const currentObj = safeGet(state, key, {});
               if (typeof currentObj === 'object' && !Array.isArray(currentObj)) {
                 safeSet(state, key, { ...currentObj, ...payload });
@@ -175,12 +522,13 @@ const appStateSlice = createSlice({
                 safeSet(state, key, payload);
               }
               break;
+            }
               
             case 'delete':
               unset(state, key);
               break;
               
-            case 'append':
+            case 'append': {
               const currentArrayAppend = safeGet(state, key, []);
               if (Array.isArray(currentArrayAppend)) {
                 safeSet(state, key, [...currentArrayAppend, payload]);
@@ -188,8 +536,9 @@ const appStateSlice = createSlice({
                 safeSet(state, key, [payload]);
               }
               break;
+            }
               
-            case 'prepend':
+            case 'prepend': {
               const currentArrayPrepend = safeGet(state, key, []);
               if (Array.isArray(currentArrayPrepend)) {
                 safeSet(state, key, [payload, ...currentArrayPrepend]);
@@ -197,13 +546,14 @@ const appStateSlice = createSlice({
                 safeSet(state, key, [payload]);
               }
               break;
+            }
               
             default:
               safeSet(state, key, payload);
           }
         } catch (error) {
           if (process.env.NODE_ENV !== 'production') {
-            console.error(`Error in bulk update for key ${key}:`, error);
+            
           }
         }
       }
@@ -219,7 +569,7 @@ const appStateSlice = createSlice({
       
       if (!Array.isArray(currentArray)) {
         if (process.env.NODE_ENV !== 'production') {
-          console.warn(`arrayOperation: value at ${key} is not an array`);
+          
         }
         return;
       }
@@ -250,41 +600,41 @@ const appStateSlice = createSlice({
             }
             break;
             
-          case 'filter':
-            if (typeof payload === 'function') {
-              newArray = newArray.filter(payload);
-            } else if (typeof payload === 'string') {
-              // Evaluate filter expression
-              const filterFunc = new Function('item', 'index', 'array', `return ${payload}`);
-              newArray = newArray.filter(filterFunc);
-            }
-            break;
-            
-          case 'map':
-            if (typeof payload === 'function') {
-              newArray = newArray.map(payload);
-            } else if (typeof payload === 'string') {
-              // Evaluate map expression
-              const mapFunc = new Function('item', 'index', 'array', `return ${payload}`);
-              newArray = newArray.map(mapFunc);
-            }
-            break;
-            
-          case 'sort':
-            if (typeof payload === 'function') {
-              newArray.sort(payload);
-            } else if (typeof payload === 'string') {
-              // Evaluate sort comparison
-              const compareFunc = new Function('a', 'b', `return ${payload}`);
-              newArray.sort(compareFunc);
-            } else {
-              newArray.sort();
-            }
-            break;
+                      case 'filter':
+              if (typeof payload === 'function') {
+                newArray = newArray.filter(payload);
+              } else if (typeof payload === 'string') {
+                // Evaluate filter expression
+                const filterFunc = new Function('item', 'index', 'array', `return ${payload}`) as any;
+                newArray = newArray.filter(filterFunc);
+              }
+              break;
+              
+            case 'map':
+              if (typeof payload === 'function') {
+                newArray = newArray.map(payload);
+              } else if (typeof payload === 'string') {
+                // Evaluate map expression
+                const mapFunc = new Function('item', 'index', 'array', `return ${payload}`) as any;
+                newArray = newArray.map(mapFunc);
+              }
+              break;
+              
+            case 'sort':
+              if (typeof payload === 'function') {
+                newArray.sort(payload);
+              } else if (typeof payload === 'string') {
+                // Evaluate sort comparison
+                const compareFunc = new Function('a', 'b', `return ${payload}`) as any;
+                newArray.sort(compareFunc);
+              } else {
+                newArray.sort();
+              }
+              break;
             
           default:
             if (process.env.NODE_ENV !== 'production') {
-              console.warn(`Unknown array operation: ${operation}`);
+              
             }
             return;
         }
@@ -292,7 +642,7 @@ const appStateSlice = createSlice({
         safeSet(state, key, newArray);
       } catch (error) {
         if (process.env.NODE_ENV !== 'production') {
-          console.error(`Error in array operation ${operation}:`, error);
+          
         }
       }
     },
@@ -323,7 +673,7 @@ const appStateSlice = createSlice({
         safeSet(state, key, transformedValue);
       } catch (error) {
         if (process.env.NODE_ENV !== 'production') {
-          console.error(`Error in transform for key ${key}:`, error);
+          
         }
       }
     },
@@ -369,7 +719,7 @@ const appStateSlice = createSlice({
         unset(state, key);
       } catch (error) {
         if (process.env.NODE_ENV !== 'production') {
-          console.error(`Error deleting property ${key}:`, error);
+          
         }
       }
     },
@@ -395,8 +745,8 @@ const appStateSlice = createSlice({
       if (properties && Array.isArray(properties)) {
         // Spread only specific properties
         properties.forEach(prop => {
-          if (sourceObj.hasOwnProperty(prop)) {
-            spreadData[prop] = sourceObj[prop];
+          if (Object.prototype.hasOwnProperty.call(sourceObj, prop)) {
+            spreadData[prop] = (sourceObj as any)[prop];
           }
         });
       } else {
@@ -421,7 +771,7 @@ const appStateSlice = createSlice({
       if (keys && Array.isArray(keys)) {
         // Reset specific keys
         keys.forEach(key => {
-          if (resetValues.hasOwnProperty(key)) {
+          if (Object.prototype.hasOwnProperty.call(resetValues, key)) {
             safeSet(state, key, resetValues[key]);
           } else {
             unset(state, key);
@@ -503,7 +853,7 @@ const appStateSlice = createSlice({
       }
 
       if (process.env.NODE_ENV !== 'production' && errors.length > 0) {
-        console.warn('Batch update errors:', errors);
+        
       }
     },
 
