@@ -18,7 +18,12 @@ const Views = () => {
   const params = useParams();
   
   // Get current app from Redux store
-  const appConfig = useSelector((state: any) => state.currentApp?.currentApplication);
+  const currentAppSlice = useSelector((state: any) => state.currentApp);
+  const appConfig = useSelector((state: any) => {
+    console.log('🔍 Selector - Full state:', state);
+    console.log('🔍 Selector - currentApp slice:', state.currentApp);
+    return state.currentApp?.currentApplication;
+  });
   const appState = useSelector((state: any) => state.appState);
 
   console.log('📊 Views - Redux State:', {

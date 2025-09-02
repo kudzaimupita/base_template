@@ -21,11 +21,16 @@ function AppInitializer() {
 
   // Initialize app on startup
   useEffect(() => {
+    console.log('🚀 AppInitializer: Starting initialization...');
+    console.log('📦 AppConfig to dispatch:', appConfig);
+    
     // Set the current app with appConfig
     dispatch(setCurrentApp(appConfig));
+    console.log('✅ AppInitializer: Dispatched setCurrentApp');
     
     // Initialize Google Fonts service
     googleFontsService.initialize();
+    console.log('✅ AppInitializer: Google Fonts initialized');
   }, [dispatch]);
 
   return <Views />;

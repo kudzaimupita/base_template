@@ -12,15 +12,18 @@ import currentAppState from './slices/currentApp/currentAppState';
 
 // import RtkQueryService from '@/services/RtkQueryService';
 
-export type RootState = CombinedState<{
+export type RootState = {
   auth: CombinedState<AuthState>;
   base: CombinedState<BaseState>;
   locale: LocaleState;
   // theme: ThemeState;
   dragAndDrop: DragAndDropState;
+  appState: any;
+  appPersistedState: any;
+  currentApp: any;
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
-}>;
+};
 
 export interface AsyncReducers {
   [key: string]: Reducer<any, AnyAction>;
@@ -34,11 +37,11 @@ const staticReducers = {
   dragAndDrop: dragAndDropReducer,
   appState: appState,
   appPersistedState,
-  currentAppState,
+  currentApp: currentAppState,
   // [RtkQueryService.reducerPath]: RtkQueryService.reducer,
 };
 
-const rootReducer = (asyncReducers?: AsyncReducers) => (state: RootState, action: AnyAction) => {
+const rootReducer = (asyncReducers?: AsyncReducers) => (state: any, action: AnyAction) => {
   const combinedReducer = combineReducers({
     ...staticReducers,
     ...asyncReducers,
