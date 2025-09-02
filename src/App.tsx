@@ -25,7 +25,7 @@ function AppInitializer() {
     dispatch(setCurrentApp(appConfig));
     
     // Initialize Google Fonts service
-    googleFontsService.initialize().catch(console.error);
+    googleFontsService.initialize();
   }, [dispatch]);
 
   return <Views />;

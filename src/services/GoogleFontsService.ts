@@ -62,11 +62,9 @@ class GoogleFontsService {
       await this.preloadAllFonts();
       
       this.initialized = true;
-      console.log('Google Fonts service initialized successfully - all fonts loaded');
       message.success(`Loaded ${this.fonts.length} Google Fonts for styling`);
   
     } catch (error) {
-      console.error('Failed to initialize Google Fonts:', error);
       // Use fallback font list if API fails
       this.useFallbackFonts();
       // Still load fallback fonts
@@ -81,7 +79,6 @@ class GoogleFontsService {
   private async fetchFontList(): Promise<void> {
     // Check if API key is configured
     if (!GOOGLE_FONTS_API_KEY || GOOGLE_FONTS_API_KEY === 'YOUR_GOOGLE_FONTS_API_KEY_HERE') {
-      console.warn('Google Fonts API key not configured');
       this.loadCachedFonts();
       return;
     }
@@ -96,10 +93,9 @@ class GoogleFontsService {
         // Cache is still valid
         try {
           this.fonts = JSON.parse(cachedData);
-          console.log(`Loaded ${this.fonts.length} fonts from cache`);
           return;
         } catch (e) {
-          console.error('Error parsing cached Google Fonts:', e);
+          // Error parsing cached fonts, will fetch fresh data
         }
       }
     }
@@ -119,9 +115,7 @@ class GoogleFontsService {
       localStorage.setItem(CACHE_KEY, JSON.stringify(this.fonts));
       localStorage.setItem(CACHE_EXPIRY_KEY, String(Date.now() + CACHE_DURATION));
       
-      console.log(`Fetched and cached ${this.fonts.length} fonts from Google Fonts API`);
     } catch (error) {
-      console.warn('Failed to fetch fonts from API, using cached data');
       this.loadCachedFonts();
     }
   }
@@ -134,9 +128,7 @@ class GoogleFontsService {
     if (cached) {
       try {
         this.fonts = JSON.parse(cached);
-        console.log(`Loaded ${this.fonts.length} fonts from cache`);
       } catch (error) {
-        console.error('Failed to parse cached fonts');
         this.useFallbackFonts();
       }
     } else {
@@ -154,7 +146,6 @@ class GoogleFontsService {
       subsets: ['latin'],
       category: 'sans-serif'
     }));
-    console.log(`Using fallback fonts: ${this.fonts.length} fonts available`);
   }
 
   /**
@@ -209,8 +200,6 @@ class GoogleFontsService {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-    
-    console.log(`Loaded all ${totalFonts} Google Fonts in ${Math.ceil(totalFonts / batchSize)} batches`);
   }
 
   /**
@@ -254,7 +243,6 @@ class GoogleFontsService {
     document.head.appendChild(link);
     
     this.loadedFonts.add(family);
-    console.log(`Loaded font: ${family} with variants: ${weightsStr}`);
   }
 
   /**
@@ -267,7 +255,6 @@ class GoogleFontsService {
     if (link) {
       link.remove();
       this.loadedFonts.delete(family);
-      console.log(`Unloaded font: ${family}`);
     }
   }
 
@@ -341,7 +328,6 @@ class GoogleFontsService {
   clearCache(): void {
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem(CACHE_EXPIRY_KEY);
-    console.log('Google Fonts cache cleared');
   }
 
   /**
@@ -392,7 +378,6 @@ class GoogleFontsService {
     document.head.appendChild(link);
     
     this.loadedFonts.add(family);
-    console.log(`Loaded custom font: ${family} from ${cssUrl}`);
   }
 }
 
