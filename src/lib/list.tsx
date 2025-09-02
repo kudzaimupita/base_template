@@ -1,5 +1,6 @@
 import MyComponent from './ReactEditor';
 import { unescape } from 'html-escaper';
+
 export const generateComponentGroups = (component: any) => ({
   value: component._id,
   label: component.name,

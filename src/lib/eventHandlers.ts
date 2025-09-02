@@ -130,6 +130,12 @@ export const genericEventHandlers = {
       description: 'Triggered when an element fails validation',
       config: { uiType: 'eventHandler' },
     },
+    onFormChange: {
+      type: 'string',
+      title: 'On Form Change',
+      description: 'Fires when any form field changes',
+      config: { uiType: 'eventHandler' },
+    },
 
     // Clipboard Events
     onCopy: {
@@ -336,6 +342,72 @@ export const genericEventHandlers = {
       description: 'Fires when media volume changes',
       config: { uiType: 'eventHandler' },
     },
+    onLoadStart: {
+      type: 'string',
+      title: 'On Load Start',
+      description: 'Triggered when media loading begins',
+      config: { uiType: 'eventHandler' },
+    },
+    onLoadedData: {
+      type: 'string',
+      title: 'On Loaded Data',
+      description: 'Fires when media data is loaded',
+      config: { uiType: 'eventHandler' },
+    },
+    onLoadedMetadata: {
+      type: 'string',
+      title: 'On Loaded Metadata',
+      description: 'Triggered when media metadata is loaded',
+      config: { uiType: 'eventHandler' },
+    },
+    onProgress: {
+      type: 'string',
+      title: 'On Progress',
+      description: 'Fires during media loading progress',
+      config: { uiType: 'eventHandler' },
+    },
+    onDurationChange: {
+      type: 'string',
+      title: 'On Duration Change',
+      description: 'Triggered when media duration changes',
+      config: { uiType: 'eventHandler' },
+    },
+    onRateChange: {
+      type: 'string',
+      title: 'On Rate Change',
+      description: 'Fires when media playback rate changes',
+      config: { uiType: 'eventHandler' },
+    },
+    onSeeked: {
+      type: 'string',
+      title: 'On Seeked',
+      description: 'Triggered when media seeking completes',
+      config: { uiType: 'eventHandler' },
+    },
+    onSeeking: {
+      type: 'string',
+      title: 'On Seeking',
+      description: 'Fires when media seeking begins',
+      config: { uiType: 'eventHandler' },
+    },
+    onStalled: {
+      type: 'string',
+      title: 'On Stalled',
+      description: 'Triggered when media loading stalls',
+      config: { uiType: 'eventHandler' },
+    },
+    onSuspend: {
+      type: 'string',
+      title: 'On Suspend',
+      description: 'Fires when media loading is suspended',
+      config: { uiType: 'eventHandler' },
+    },
+    onWaiting: {
+      type: 'string',
+      title: 'On Waiting',
+      description: 'Triggered when media is waiting for data',
+      config: { uiType: 'eventHandler' },
+    },
 
     // Image Events
     onLoad: {
@@ -382,6 +454,174 @@ export const genericEventHandlers = {
       type: 'string',
       title: 'On Resize',
       description: 'Triggered when the document view is resized',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Selection Events
+    onSelect: {
+      type: 'string',
+      title: 'On Select',
+      description: 'Fires when text is selected in an input or textarea',
+      config: { uiType: 'eventHandler' },
+    },
+    onSelectionChange: {
+      type: 'string',
+      title: 'On Selection Change',
+      description: 'Triggered when the selection changes',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Form Validation Events
+    onBeforeInput: {
+      type: 'string',
+      title: 'On Before Input',
+      description: 'Fires before input data is entered',
+      config: { uiType: 'eventHandler' },
+    },
+    onFormData: {
+      type: 'string',
+      title: 'On Form Data',
+      description: 'Triggered when form data is being processed',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Toggle Events
+    onToggle: {
+      type: 'string',
+      title: 'On Toggle',
+      description: 'Fires when a details element is opened or closed',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Fullscreen Events
+    onFullscreenChange: {
+      type: 'string',
+      title: 'On Fullscreen Change',
+      description: 'Triggered when fullscreen mode changes',
+      config: { uiType: 'eventHandler' },
+    },
+    onFullscreenError: {
+      type: 'string',
+      title: 'On Fullscreen Error',
+      description: 'Fires when entering fullscreen mode fails',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Visibility Events
+    onVisibilityChange: {
+      type: 'string',
+      title: 'On Visibility Change',
+      description: 'Triggered when page visibility changes',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Connection Events
+    onOnline: {
+      type: 'string',
+      title: 'On Online',
+      description: 'Fires when the browser goes online',
+      config: { uiType: 'eventHandler' },
+    },
+    onOffline: {
+      type: 'string',
+      title: 'On Offline',
+      description: 'Triggered when the browser goes offline',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Storage Events
+    onStorage: {
+      type: 'string',
+      title: 'On Storage',
+      description: 'Fires when localStorage or sessionStorage changes',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Device Events
+    onDeviceMotion: {
+      type: 'string',
+      title: 'On Device Motion',
+      description: 'Triggered when device motion is detected',
+      config: { uiType: 'eventHandler' },
+    },
+    onDeviceOrientation: {
+      type: 'string',
+      title: 'On Device Orientation',
+      description: 'Fires when device orientation changes',
+      config: { uiType: 'eventHandler' },
+    },
+
+    // Custom Application Events
+    onMount: {
+      type: 'string',
+      title: 'On Mount',
+      description: 'Custom event fired when component mounts',
+      config: { uiType: 'eventHandler' },
+    },
+    onUnmount: {
+      type: 'string',
+      title: 'On Unmount',
+      description: 'Custom event fired when component unmounts',
+      config: { uiType: 'eventHandler' },
+    },
+    onRefresh: {
+      type: 'string',
+      title: 'On Refresh',
+      description: 'Custom event for refresh actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onUpdate: {
+      type: 'string',
+      title: 'On Update',
+      description: 'Custom event for update actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onCancel: {
+      type: 'string',
+      title: 'On Cancel',
+      description: 'Custom event for cancel actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onConfirm: {
+      type: 'string',
+      title: 'On Confirm',
+      description: 'Custom event for confirmation actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onDelete: {
+      type: 'string',
+      title: 'On Delete',
+      description: 'Custom event for delete actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onCreate: {
+      type: 'string',
+      title: 'On Create',
+      description: 'Custom event for create actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onSave: {
+      type: 'string',
+      title: 'On Save',
+      description: 'Custom event for save actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onSearch: {
+      type: 'string',
+      title: 'On Search',
+      description: 'Custom event for search actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onFilter: {
+      type: 'string',
+      title: 'On Filter',
+      description: 'Custom event for filter actions',
+      config: { uiType: 'eventHandler' },
+    },
+    onSort: {
+      type: 'string',
+      title: 'On Sort',
+      description: 'Custom event for sort actions',
       config: { uiType: 'eventHandler' },
     },
   },

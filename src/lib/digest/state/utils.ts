@@ -291,12 +291,19 @@ function secureInterpolate(template, sources) {
   if (template && typeof template === 'object' && !Array.isArray(template)) {
     // If it's a plain object with string values that contain template patterns, process it directly
     // Otherwise, stringify it first
-    const hasTemplatePatterns = Object.values(template).some(value => 
-      typeof value === 'string' && value.includes('{{') && value.includes('}}')
+    const hasTemplatePatterns = Object.values(template).some(
+      (value) => typeof value === 'string' && value.includes('{{') && value.includes('}}')
     );
-    
+
     if (!hasTemplatePatterns) {
       template = JSON.stringify(template);
+    }
+  }
+
+  // Debug logging for state access
+  const isStateTemplate = typeof template === 'string' && template.includes('{{state.');
+  if (isStateTemplate) {
+    if (sources.state) {
     }
   }
 
@@ -351,11 +358,12 @@ function secureInterpolate(template, sources) {
       flattenDeep: (arr) => arr.flat(Infinity),
       uniq: (arr) => [...new Set(arr)],
       merge: (target, ...sources) => Object.assign({}, target, ...sources),
-      sortBy: (arr, iteratee) => arr.sort((a, b) => {
-        const aVal = typeof iteratee === 'function' ? iteratee(a) : a[iteratee];
-        const bVal = typeof iteratee === 'function' ? iteratee(b) : b[iteratee];
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      }),
+      sortBy: (arr, iteratee) =>
+        arr.sort((a, b) => {
+          const aVal = typeof iteratee === 'function' ? iteratee(a) : a[iteratee];
+          const bVal = typeof iteratee === 'function' ? iteratee(b) : b[iteratee];
+          return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        }),
       get: (obj, path, defaultValue) => {
         const keys = path.split('.');
         let result = obj;
@@ -381,31 +389,31 @@ function secureInterpolate(template, sources) {
       isDate: (value) => value instanceof Date,
       isFunction: (value) => typeof value === 'function',
     },
-    // Merge with any additional sources provided
+    // Merge provided sources
     ...sources,
   };
 
+  // Helper function to safely get nested values
   function getValue(path, context = predefinedSources) {
-    if (path === 'null') return null;
-    if (path === 'undefined') return undefined;
-    if (path === 'true') return true;
-    if (path === 'false') return false;
-    if (!isNaN(path) && path !== '') return Number(path);
-    if (path.startsWith('"') && path.endsWith('"')) return path.slice(1, -1);
-    if (path.startsWith("'") && path.endsWith("'")) return path.slice(1, -1);
+    const keys = path.split('.');
+    let result = context;
 
-    const parts = path.split('.');
-    let value = context;
-
-    for (const part of parts) {
-      if (value && typeof value === 'object' && part in value) {
-        value = value[part];
+    for (const key of keys) {
+      if (result && typeof result === 'object' && key in result) {
+        result = result[key];
       } else {
+        // Debug logging for failed lookups
+        if (isStateTemplate && path.startsWith('state.')) {
+        }
         return undefined;
       }
     }
 
-    return typeof value === 'function' ? value() : value;
+    // Debug logging for successful lookups
+    if (isStateTemplate && path.startsWith('state.')) {
+    }
+
+    return result;
   }
 
   function evaluateComparison(left, operator, right, context = predefinedSources) {
@@ -413,28 +421,37 @@ function secureInterpolate(template, sources) {
     const rightVal = getValue(right.trim(), context);
 
     switch (operator) {
-      case '===': return leftVal === rightVal;
-      case '!==': return leftVal !== rightVal;
-      case '==': return leftVal == rightVal;
-      case '!=': return leftVal != rightVal;
-      case '>': return leftVal > rightVal;
-      case '<': return leftVal < rightVal;
-      case '>=': return leftVal >= rightVal;
-      case '<=': return leftVal <= rightVal;
-      default: return false;
+      case '===':
+        return leftVal === rightVal;
+      case '!==':
+        return leftVal !== rightVal;
+      case '==':
+        return leftVal == rightVal;
+      case '!=':
+        return leftVal != rightVal;
+      case '>':
+        return leftVal > rightVal;
+      case '<':
+        return leftVal < rightVal;
+      case '>=':
+        return leftVal >= rightVal;
+      case '<=':
+        return leftVal <= rightVal;
+      default:
+        return false;
     }
   }
 
   function evaluateLogical(expression, context = predefinedSources) {
     // Handle logical operators (&&, ||)
     if (expression.includes('&&')) {
-      const parts = expression.split('&&').map(p => p.trim());
-      return parts.every(part => evaluateExpression(part, context));
+      const parts = expression.split('&&').map((p) => p.trim());
+      return parts.every((part) => evaluateExpression(part, context));
     }
 
     if (expression.includes('||')) {
-      const parts = expression.split('||').map(p => p.trim());
-      return parts.some(part => evaluateExpression(part, context));
+      const parts = expression.split('||').map((p) => p.trim());
+      return parts.some((part) => evaluateExpression(part, context));
     }
 
     return evaluateExpression(expression, context);
@@ -481,7 +498,6 @@ function secureInterpolate(template, sources) {
       // Parse the selected value
       return parseLiteral(selectedValue) || selectedValue;
     } catch (error) {
-      
       return '';
     }
   }
@@ -526,7 +542,6 @@ function secureInterpolate(template, sources) {
         try {
           return evaluateLogical(trimmedKey, predefinedSources);
         } catch (err) {
-          
           return '';
         }
       }
@@ -547,7 +562,6 @@ function secureInterpolate(template, sources) {
       iterations++;
 
       if (iterations > maxIterations) {
-        
         break;
       }
 
@@ -587,7 +601,6 @@ function secureInterpolate(template, sources) {
             hasPlaceholders = true;
             return String(result);
           } catch (err) {
-            
             return '';
           }
         }
@@ -641,11 +654,9 @@ function secureInterpolate(template, sources) {
       if (!isNaN(str) && str !== '') return Number(str);
 
       // Handle string literals
-      if ((str.startsWith('"') && str.endsWith('"')) ||
-        (str.startsWith("'") && str.endsWith("'"))) {
+      if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
         return str.slice(1, -1);
       }
-
     } catch (err) {
       // If parsing fails, return undefined to indicate it's not a literal
       return undefined;
@@ -662,9 +673,7 @@ function secureInterpolate(template, sources) {
       return value.map((item) => parseValue(item));
     } else if (value && typeof value === 'object') {
       // Recursively process objects
-      return Object.fromEntries(
-        Object.entries(value).map(([key, val]) => [key, parseValue(val)])
-      );
+      return Object.fromEntries(Object.entries(value).map(([key, val]) => [key, parseValue(val)]));
     }
     // Return primitives as-is
     return value;
@@ -673,11 +682,11 @@ function secureInterpolate(template, sources) {
   return parseValue(template);
 }
 
-const template = "likes({{state.numberoflikes}})";
+const template = 'likes({{state.numberoflikes}})';
 const sources = {
   state: {
-    numberoflikes: 3
-  }
+    numberoflikes: 3,
+  },
 };
 
 export function dotNotationKeysToObject(obj) {
@@ -705,7 +714,6 @@ export const getUrlDetails = (paramss = {}) => {
         .then((response) => response.json())
         .then((data) => resolve(data.ip))
         .catch((error) => {
-          
           resolve(null);
         });
     });
@@ -824,11 +832,11 @@ export const getUrlDetails = (paramss = {}) => {
       // ipAddress: getPublicIP(),
       connection: (navigator as any).connection
         ? {
-          type: (navigator as any).connection.type,
-          effectiveType: (navigator as any).connection.effectiveType,
-          downlinkMax: (navigator as any).connection.downlinkMax,
-          saveData: (navigator as any).connection.saveData,
-        }
+            type: (navigator as any).connection.type,
+            effectiveType: (navigator as any).connection.effectiveType,
+            downlinkMax: (navigator as any).connection.downlinkMax,
+            saveData: (navigator as any).connection.saveData,
+          }
         : null,
 
       // Additional Network Details
@@ -905,6 +913,67 @@ export const getPublicIP = async () => {
     return null;
   }
 };
+
+/**
+ * Creates an enhanced state object that supports both global state and element-specific state
+ * @param {Object} appState - The raw app state from Redux store
+ * @param {string} compId - Current component ID for element-specific state access
+ * @returns {Object} Enhanced state object with global and element access
+ */
+function createEnhancedStateObject(appState = {}, compId) {
+  // Debug what's being passed to this function
+  
+  // Convert dot-notation keys to nested objects for element-specific state
+  const elementState = dotNotationKeysToObject(appState);
+  
+  // Separate global state from element-specific state
+  const globalState = {};
+  const elementSpecificState = {};
+  
+  // Process all state keys
+  Object.entries(appState).forEach(([key, value]) => {
+    if (key.includes('.')) {
+      // This is element-specific state (e.g., "element-id.property")
+      const parts = key.split('.');
+      if (parts.length >= 2) {
+        if (!elementSpecificState[parts[0]]) {
+          elementSpecificState[parts[0]] = {};
+        }
+        const remainingPath = parts.slice(1).join('.');
+        _.set(elementSpecificState[parts[0]], remainingPath, value);
+      }
+    } else {
+      // This is global state (e.g., "counter", "userName", etc.)
+      globalState[key] = value;
+    }
+  });
+  
+  // Create enhanced state structure
+  const enhancedState = {
+    // Global state properties (accessible as state.counter, state.userName, etc.)
+    ...globalState,
+    
+    // Element-specific state under 'elements' namespace
+    elements: elementSpecificState,
+    
+    // Current element shorthand (for convenience)
+    ...(compId && elementSpecificState[compId] ? { current: elementSpecificState[compId] } : {}),
+    
+    // Backward compatibility - keep the original dot-notation structure
+    ...elementState,
+    
+    // Add a debug helper to see what's available
+    _debug: {
+      globalKeys: Object.keys(globalState),
+      elementKeys: Object.keys(elementSpecificState),
+      allKeys: Object.keys(appState),
+      compId: compId
+    }
+  };
+  
+  return enhancedState;
+}
+
 export const retrieveBody = (type, value, event, globalObj, paramState, key, process) => {
   // Helper function to recursively resolve values
   const resolveValue = (val) => {
@@ -936,13 +1005,29 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
     if (typeof newValue !== 'string') return newValue;
 
     const state = process?.store?.getState();
-    let localStore;
+    
+    // Debug logging for state access issues
+    if (newValue.includes('{{state.')) {
+    }
+    
+    let localStore = {};
 
+    // Build localStore from all localStorage items for template access
     try {
-      const storedValue = localStorage.getItem(key || '');
-      localStore = storedValue ? JSON.parse(storedValue) : {};
+      // Get all localStorage keys for comprehensive access
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          try {
+            const value = localStorage.getItem(key);
+            localStore[key] = value ? JSON.parse(value) : value;
+          } catch (parseError) {
+            // If not JSON, store as string
+            localStore[key] = localStorage.getItem(key);
+          }
+        }
+      }
     } catch (error) {
-      
       localStore = {};
     }
 
@@ -994,9 +1079,7 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
         const parts = cleanPath.split('.');
 
         // Get the base object - if compId is missing, just use state.appState[process?.pageId]
-        let result = process?.compId
-          ? state?.appState?.[process.compId]
-          : state?.appState;
+        let result = process?.compId ? state?.appState?.[process.compId] : state?.appState;
 
         // Handle multi-level property access by traversing the object
         if (result && parts.length) {
@@ -1030,13 +1113,50 @@ export const retrieveBody = (type, value, event, globalObj, paramState, key, pro
     }
 
     // Handle non-pattern string values with secureInterpolate
-    return secureInterpolate(newValue, {
+    // Add comprehensive debugging to see the full state structure
+    
+    // Look for counter in the right state slice
+    let stateToUse = state?.appState || {};
+    
+    // If appState is empty, try to find the counter in other slices
+    if (Object.keys(stateToUse).length === 0) {
+      
+      // Check if counter exists in the root state
+      if (state && 'counter' in state) {
+        stateToUse = { counter: state['counter'] };
+      }
+      // Check if counter exists in currentAppState
+      else if (state?.currentAppState && 'counter' in state.currentAppState) {
+        stateToUse = { counter: state.currentAppState['counter'] };
+      }
+      // Check if counter exists in any other slice
+      else {
+        // Look through all state slices for counter
+        for (const [sliceName, sliceData] of Object.entries(state || {})) {
+          if (sliceData && typeof sliceData === 'object' && 'counter' in sliceData) {
+            stateToUse = { counter: sliceData['counter'] };
+            break;
+          }
+        }
+      }
+    }
+    
+    const finalEnhancedState = createEnhancedStateObject(stateToUse, process?.compId);
+    
+    // Debug the enhanced state object
+    if (newValue.includes('{{state.')) {
+    }
+    
+    
+    const result = secureInterpolate(newValue, {
       event: event,
       window: getUrlDetails(paramState),
       localStore: localStore,
-      state: dotNotationKeysToObject(state?.appState || {}),
+      state: finalEnhancedState,
       controller: dotNotationKeysToObject(globalObj || {}),
     });
+    
+    return result;
   };
 
   // Start the recursive resolution process

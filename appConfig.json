@@ -1,0 +1,25 @@
+{
+  "id": "default-app",
+  "name": "Default Application",
+  "title": "My App",
+  "version": "1.0.0",
+  "description": "Default application configuration",
+  "icon": "",
+  "layoutSettings": {
+    "defaultPrivatePage": null
+  },
+  "views": [
+    {
+      "id": "home",
+      "name": "Home",
+      "path": "/home",
+      "layout": [],
+      "style": {}
+    }
+  ],
+  "theme": {
+    "primaryColor": "#1890ff",
+    "fontFamily": "Inter"
+  },
+  "settings": {}
+} 

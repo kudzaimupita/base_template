@@ -32,8 +32,8 @@ export const flattenStyleObject = (obj = {}, transform = '', editMode = false) =
   //   cleanedObj.pointerEvents = "none";
   // }
   if (editMode) {
-    delete cleanedObj?.transition
-    delete cleanedObj?._keyframes
+    delete cleanedObj?.transition;
+    delete cleanedObj?._keyframes;
   }
   return cleanedObj;
 };

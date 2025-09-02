@@ -1,11 +1,10 @@
-
 import { CloseOutlined, DownOutlined, RightOutlined, CopyOutlined, MinusOutlined } from '@ant-design/icons';
 import React, { useState } from 'react';
 import ReactJson from 'react-json-view';
 import { notification } from 'antd';
 
 let notificationCounter = 0;
-let activeNotifications: Set<string> = new Set();
+const activeNotifications: Set<string> = new Set();
 
 const CollapsibleSection: React.FC<{
   title: string;
@@ -29,7 +28,6 @@ const CollapsibleSection: React.FC<{
     <div className="json-debug-section mb-1">
       <div
         className="json-debug-section-header"
-        onClick={() => setCollapsed(!collapsed)}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -42,6 +40,7 @@ const CollapsibleSection: React.FC<{
           border: '1px solid #404040',
           transition: 'all 0.2s ease',
         }}
+        onClick={() => setCollapsed(!collapsed)}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = '#2d2d2d';
           e.currentTarget.style.borderColor = '#525252';
@@ -82,7 +81,6 @@ const CollapsibleSection: React.FC<{
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
-            onClick={handleCopy}
             style={{
               background: 'none',
               border: 'none',
@@ -94,6 +92,7 @@ const CollapsibleSection: React.FC<{
               alignItems: 'center',
               transition: 'all 0.2s ease',
             }}
+            onClick={handleCopy}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#374151';
               e.currentTarget.style.color = '#e2e8f0';
@@ -173,13 +172,11 @@ const JsonDebugContent: React.FC<{
   );
 };
 
-
-
 /**
  * Show a premium debug notification with ReactJson view
  * Allows multiple notifications to be displayed simultaneously
  */
-export function showJsonDebug(data: Record<string, any>, title: string = 'Debug'): void {
+export function showJsonDebug(data: Record<string, any>, title = 'Debug'): void {
   // Create new notification
   const id = `debug-${++notificationCounter}`;
 
@@ -223,10 +220,6 @@ export function showJsonDebug(data: Record<string, any>, title: string = 'Debug'
           </span>
         </div>
         <button
-          onClick={() => {
-            notification.destroy(id);
-            activeNotifications.delete(id);
-          }}
           style={{
             background: 'none',
             border: 'none',
@@ -237,6 +230,10 @@ export function showJsonDebug(data: Record<string, any>, title: string = 'Debug'
             display: 'flex',
             alignItems: 'center',
             transition: 'all 0.2s ease',
+          }}
+          onClick={() => {
+            notification.destroy(id);
+            activeNotifications.delete(id);
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = '#374151';
@@ -282,11 +279,26 @@ export function logJsonDebug(
   process
 ): void {
   // Parse any string values that might be JSON
-  const state = localStorage.getItem(sessionKey);
+  const state = sessionKey ? localStorage.getItem(sessionKey) : null;
   const parsedState = state ? tryParseJSON(state) : {};
 
-  const sessionInfo = sessionKey ? localStorage.getItem(sessionKey + '-sessionInfo') : '{}';
-  const parsedSessionInfo = tryParseJSON(sessionInfo);
+  // Build localStorage data from all available keys for debugging
+  const localStorageData = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        try {
+          const value = localStorage.getItem(key);
+          localStorageData[key] = value ? JSON.parse(value) : value;
+        } catch (parseError) {
+          localStorageData[key] = localStorage.getItem(key);
+        }
+      }
+    }
+  } catch (error) {
+    // localStorage access might be restricted
+  }
 
   function getCircularReplacer() {
     const seen = new WeakSet();
@@ -308,7 +320,7 @@ export function logJsonDebug(
     history: getUrlDetails(paramState),
     event: JSON.parse(stringified),
     state: parsedState,
-    sessionInfo: parsedSessionInfo,
+    localStorage: localStorageData,
   };
 
   showJsonDebug(debugData, process.name || 'Workflow Debug');

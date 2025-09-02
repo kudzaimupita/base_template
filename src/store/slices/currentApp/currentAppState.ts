@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
 import { message } from 'antd';
+import appConfig from '../../../../appConfig.json';
 
 // import { getApplication } from '@/services/ApplicationService';
 
@@ -42,7 +43,7 @@ export const fetchApp = createAsyncThunk('app/fetchApp', async ({ id, tab, setti
 // Initial state
 export const initialState = {
   applications: [],
-  currentApplication: null,
+  currentApplication: appConfig, // Set appConfig as default currentApplication
   components: [],
   events: [],
 };

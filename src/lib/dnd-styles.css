@@ -1,0 +1,47 @@
+/* Global dragging styles for better performance */
+body.dragging {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: grabbing !important;
+}
+
+body.dragging * {
+  cursor: grabbing !important;
+}
+
+/* Disable transitions during drag for better performance */
+body.dragging .cube {
+  transition: none !important;
+}
+
+/* Container hover styles */
+[data-is-container="true"][data-sortable-over="true"] {
+  background-color: rgba(74, 144, 226, 0.05);
+  outline: 2px dashed #4a90e2;
+  outline-offset: -2px;
+}
+
+/* Dragging element styles */
+[data-sortable-id][data-sortable-dragging="true"] {
+  opacity: 0.3;
+}
+
+/* Smooth transitions when not dragging */
+body:not(.dragging) [data-sortable-id] {
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
+/* Placeholder styles */
+.sortable-placeholder {
+  background-color: rgba(74, 144, 226, 0.1);
+  border: 2px dashed #4a90e2;
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+/* Optimize rendering with GPU acceleration */
+[data-sortable-id] {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}

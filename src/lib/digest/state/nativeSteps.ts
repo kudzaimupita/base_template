@@ -5,6 +5,7 @@ import { clearMemoizationCache, executeProcess, messageLogger, processBatch, Sem
 import { generateObject } from './actions';
 import moment from 'moment';
 import { message } from 'antd';
+
 const BATCH_SIZE = 10; // Configurable batch size for concurrent processing
 const MAX_CONCURRENT_OPERATIONS = 5; // Limit concurrent operations to prevent overwhelming
 
@@ -171,208 +172,202 @@ export const nativePlugins = {
         }
       },
     },
-{
-  key: 'loop',
-  label: 'Loop',
-  schema: {
-    type: 'object',
-    properties: {
-      name: {
-        title: 'Name',
-        type: 'string',
-        pattern: '^[^.]+$',
-        description: 'No spaces, caps',
-      },
-      list: {
-        title: 'Array to Loop Over',
+    {
+      key: 'loop',
+      label: 'Loop',
+      schema: {
         type: 'object',
         properties: {
-          value: {
+          name: {
+            title: 'Name',
             type: 'string',
-            title: 'Value',
+            pattern: '^[^.]+$',
+            description: 'No spaces, caps',
+          },
+          list: {
+            title: 'Array to Loop Over',
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Value',
+              },
+            },
+          },
+          assignToKey: {
+            title: 'Assign Key',
+            type: 'string',
+          },
+          appendToGlobal: {
+            title: 'Append To Global Return',
+            type: 'boolean',
+            default: true,
+          },
+          terminateOnError: {
+            title: 'Short Circuit On Error',
+            type: 'boolean',
+            default: true,
+          },
+          // New performance options
+          batchSize: {
+            title: 'Batch Size',
+            type: 'number',
+            default: BATCH_SIZE,
+            minimum: 1,
+            maximum: 100,
+          },
+          maxConcurrent: {
+            title: 'Max Concurrent Operations',
+            type: 'number',
+            default: 10,
+            minimum: 1,
+            maximum: 20,
           },
         },
+        required: ['name', 'list'],
       },
-      assignToKey: {
-        title: 'Assign Key',
-        type: 'string',
-      },
-      appendToGlobal: {
-        title: 'Append To Global Return',
-        type: 'boolean',
-        default: true,
-      },
-      terminateOnError: {
-        title: 'Short Circuit On Error',
-        type: 'boolean',
-        default: true,
-      },
-      // New performance options
-      batchSize: {
-        title: 'Batch Size',
-        type: 'number',
-        default: BATCH_SIZE,
-        minimum: 1,
-        maximum: 100,
-      },
-      maxConcurrent: {
-        title: 'Max Concurrent Operations',
-        type: 'number',
-        default: 10,
-        minimum: 1,
-        maximum: 20,
+      process: async (
+        process,
+        globalObj,
+        globalErrors,
+        event,
+        currentLog,
+        appId,
+        navigate,
+        paramState,
+        sessionKey,
+        debug
+      ) => {
+        const startTime = performance.now();
+
+        let list;
+        const localErrors = [];
+        const processes = process.sequence || [];
+
+        // Get the list data
+        list = retrieveBody('', process?.list?.value, event, globalObj, paramState, sessionKey, process);
+
+        if (process.editMode === true && Array.isArray(list)) {
+          list = list.slice(0, 25);
+          messageLogger.warn('List capped at 25 items on editMode');
+        }
+
+        const data = Array.from(list);
+
+        if (!_.isArray(data)) {
+          messageLogger.error(`Invalid list ${JSON.stringify(list)}`);
+          globalErrors[process.name] = `Invalid list ${JSON.stringify(list)}`;
+          return;
+        }
+
+        if (data.length === 0) {
+          globalObj[process.name] = [];
+          return;
+        }
+
+        const batchSize = process.batchSize || BATCH_SIZE;
+        const maxConcurrent = process.maxConcurrent || MAX_CONCURRENT_OPERATIONS;
+        const semaphore = new Semaphore(maxConcurrent);
+
+        messageLogger.info(`Starting optimized loop processing`, {
+          itemCount: data.length,
+          batchSize,
+          maxConcurrent,
+          processName: process.name,
+        });
+
+        try {
+          // Optimized batch processing function
+          const processItem = async (item, index) => {
+            await semaphore.acquire();
+
+            try {
+              // Set current item context more efficiently
+              const itemKey = `${process.name}._currentItem_`;
+              const indexKey = `${process.name}._currentIndex_`;
+
+              globalObj[itemKey] = item;
+              globalObj[indexKey] = index;
+
+              // Create optimized process configuration
+              const optimizedProcesses = processes.map((processItem) => ({
+                ...processItem,
+                name: `${process.name}.${processItem.name}`,
+                renderElementUtil: process?.renderElementUtil,
+                currentItem: item,
+                currentIndex: index,
+                compId: process?.compId,
+              }));
+
+              const result = await executeProcess(
+                0,
+                optimizedProcesses,
+                appId,
+                navigate,
+                paramState,
+                debug,
+                process.compId,
+                process.pageId,
+                event,
+                process?.renderElementUtil,
+                process?.editMode,
+                process
+              );
+
+              // Clean up context immediately
+              delete globalObj[itemKey];
+              delete globalObj[indexKey];
+
+              return getValueByPath(result?.data, process.name);
+            } catch (error) {
+              if (process.terminateOnError) {
+                throw error;
+              }
+
+              localErrors.push({ index, error: error.message });
+              return null;
+            } finally {
+              semaphore.release();
+            }
+          };
+
+          // Process in optimized batches
+          const results = await processBatch(data, batchSize, processItem);
+
+          // Filter out null results (from errors) if not terminating on error
+          const validResults = results.filter((result) => result !== null);
+
+          globalObj[process.name] = validResults;
+
+          if (localErrors.length > 0 && !process.terminateOnError) {
+            globalErrors[process.name] = localErrors;
+          }
+
+          const duration = performance.now() - startTime;
+          messageLogger.success(`Optimized loop completed`, {
+            processName: process.name,
+            itemCount: data.length,
+            resultCount: validResults.length,
+            errorCount: localErrors.length,
+            duration: `${duration.toFixed(2)}ms`,
+            averagePerItem: `${(duration / data.length).toFixed(2)}ms`,
+          });
+
+          // Clear memoization cache periodically
+          clearMemoizationCache();
+        } catch (error) {
+          const duration = performance.now() - startTime;
+
+          messageLogger.error('Optimized loop execution failed', {
+            processName: process.name,
+            error: error.message,
+            duration: `${duration.toFixed(2)}ms`,
+          });
+
+          globalErrors[process.name] = error.message || error;
+        }
       },
     },
-    required: ['name', 'list'],
-  },
-  process: async (
-    process,
-    globalObj,
-    globalErrors,
-    event,
-    currentLog,
-    appId,
-    navigate,
-    paramState,
-    sessionKey,
-    debug
-  ) => {
-    const startTime = performance.now();
-
-    let list;
-    const localErrors = [];
-    const processes = process.sequence || [];
-  
-    // Get the list data
-list = retrieveBody('', process?.list?.value, event, globalObj, paramState, sessionKey, process);
-
-if (process.editMode === true && Array.isArray(list)) {
-  list = list.slice(0, 25);
-  messageLogger.warn('List capped at 25 items on editMode')
-}
-
-const data = Array.from(list);
-
-    
-    if (!_.isArray(data)) {
-      messageLogger.error(`Invalid list ${JSON.stringify(list)}`);
-      globalErrors[process.name] = `Invalid list ${JSON.stringify(list)}`;
-      return;
-    }
-
-    if (data.length === 0) {
-      globalObj[process.name] = [];
-      return;
-    }
-
-    const batchSize = process.batchSize || BATCH_SIZE;
-    const maxConcurrent = process.maxConcurrent || MAX_CONCURRENT_OPERATIONS;
-    const semaphore = new Semaphore(maxConcurrent);
-    
-    messageLogger.info(`Starting optimized loop processing`, {
-      itemCount: data.length,
-      batchSize,
-      maxConcurrent,
-      processName: process.name
-    });
-
-    try {
-      // Optimized batch processing function
-      const processItem = async (item, index) => {
-        await semaphore.acquire();
-        
-        try {
-          // Set current item context more efficiently
-          const itemKey = `${process.name}._currentItem_`;
-          const indexKey = `${process.name}._currentIndex_`;
-          
-          globalObj[itemKey] = item;
-          globalObj[indexKey] = index;
-
-          // Create optimized process configuration
-          const optimizedProcesses = processes.map((processItem) => ({
-            ...processItem,
-            name: `${process.name}.${processItem.name}`,
-            renderElementUtil: process?.renderElementUtil,
-            currentItem: item,
-            currentIndex: index,
-            compId: process?.compId,
-          }));
-
-          const result = await executeProcess(
-            0,
-            optimizedProcesses,
-            appId,
-            navigate,
-            paramState,
-            debug,
-            process.compId,
-            process.pageId,
-            event,
-            process?.renderElementUtil,
-            process?.editMode,
-            process
-          );
-
-          // Clean up context immediately
-          delete globalObj[itemKey];
-          delete globalObj[indexKey];
-
-          return getValueByPath(result?.data, process.name);
-          
-        } catch (error) {
-          
-          
-          if (process.terminateOnError) {
-            throw error;
-          }
-          
-          localErrors.push({ index, error: error.message });
-          return null;
-        } finally {
-          semaphore.release();
-        }
-      };
-
-      // Process in optimized batches
-      const results = await processBatch(data, batchSize, processItem);
-      
-      // Filter out null results (from errors) if not terminating on error
-      const validResults = results.filter(result => result !== null);
-      
-      globalObj[process.name] = validResults;
-
-      if (localErrors.length > 0 && !process.terminateOnError) {
-        globalErrors[process.name] = localErrors;
-      }
-
-      const duration = performance.now() - startTime;
-      messageLogger.success(`Optimized loop completed`, {
-        processName: process.name,
-        itemCount: data.length,
-        resultCount: validResults.length,
-        errorCount: localErrors.length,
-        duration: `${duration.toFixed(2)}ms`,
-        averagePerItem: `${(duration / data.length).toFixed(2)}ms`
-      });
-
-      // Clear memoization cache periodically
-      clearMemoizationCache();
-
-    } catch (error) {
-      const duration = performance.now() - startTime;
-      
-      messageLogger.error('Optimized loop execution failed', {
-        processName: process.name,
-        error: error.message,
-        duration: `${duration.toFixed(2)}ms`
-      });
-      
-      
-      globalErrors[process.name] = error.message || error;
-    }
-  },
-},
     {
       key: 'array-isArray',
       label: 'Is Array',
@@ -8221,6 +8216,474 @@ const data = Array.from(list);
               error: 'something went wrong',
             }),
           };
+        }
+      },
+    },
+    {
+      key: 'unified-math',
+      label: 'Unified Math Operations',
+      schema: {
+        type: 'object',
+        properties: {
+          name: {
+            title: 'Step Name',
+            type: 'string',
+            pattern: '^[^.]+$',
+            description: 'Name for this math step (no spaces, no dots)',
+            default: 'mathCalculations',
+          },
+          calculations: {
+            title: 'Calculations',
+            type: 'array',
+            description: 'Multiple calculations to perform in this step',
+            minItems: 1,
+            items: {
+              type: 'object',
+              properties: {
+                name: {
+                  title: 'Result Name',
+                  type: 'string',
+                  pattern: '^[^.]+$',
+                  description: 'Name to store this calculation result (e.g., "bmi", "total", "percentage")',
+                },
+                description: {
+                  title: 'Description',
+                  type: 'string',
+                  description: 'Optional: What this calculation does (e.g., "Calculate BMI", "Find total cost")',
+                },
+                expression: {
+                  title: 'Math Expression',
+                  type: 'string',
+                  description: 'Mathematical expression using +, -, *, /, %, ^, sqrt(), abs(), min(), max(), avg(), round(), ceil(), floor(), sin(), cos(), tan(), log(), ln(), and variables',
+                  default: 'value1 + value2',
+                },
+                precision: {
+                  title: 'Decimal Places',
+                  type: 'integer',
+                  description: 'Number of decimal places (-1 for no rounding)',
+                  default: -1,
+                  minimum: -1,
+                  maximum: 10,
+                },
+                variables: {
+                  title: 'Variables for this calculation',
+                  type: 'array',
+                  description: 'Variables used in this specific calculation',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: {
+                        type: 'string',
+                        title: 'Variable Name',
+                        description: 'Name used in the expression (e.g., "value1", "height", "weight")',
+                      },
+                      from: {
+                        type: 'string',
+                        title: 'Source',
+                        enum: ['request', 'controller', 'manual', 'state', 'global', 'calculation'],
+                        default: 'manual',
+                        description: 'Where to get the value from',
+                      },
+                      value: {
+                        type: 'string',
+                        title: 'Value',
+                        description: 'The value, path, or reference to previous calculation (e.g., "42", "{{state.user.age}}", "{{calc.bmi}}")',
+                      },
+                      defaultValue: {
+                        type: 'number',
+                        title: 'Default Value',
+                        description: 'Fallback if value cannot be resolved',
+                        default: 0,
+                      },
+                    },
+                    required: ['name', 'value'],
+                  },
+                },
+                condition: {
+                  title: 'Condition (Optional)',
+                  type: 'string',
+                  description: 'Only calculate if condition is true (e.g., "age > 18", "weight > 0")',
+                },
+              },
+              required: ['name', 'expression'],
+            },
+            default: [
+              {
+                name: 'result1',
+                expression: 'value1 + value2',
+                variables: [
+                  { name: 'value1', from: 'manual', value: '10' },
+                  { name: 'value2', from: 'manual', value: '20' }
+                ]
+              }
+            ],
+          },
+          globalVariables: {
+            title: 'Global Variables',
+            type: 'array',
+            description: 'Variables available to all calculations in this step',
+            items: {
+              type: 'object',
+              properties: {
+                name: {
+                  type: 'string',
+                  title: 'Variable Name',
+                  description: 'Name used across all calculations',
+                },
+                from: {
+                  type: 'string',
+                  title: 'Source',
+                  enum: ['request', 'controller', 'manual', 'state', 'global'],
+                  default: 'manual',
+                  description: 'Where to get the value from',
+                },
+                value: {
+                  type: 'string',
+                  title: 'Value',
+                  description: 'The value or path to the value',
+                },
+                defaultValue: {
+                  type: 'number',
+                  title: 'Default Value',
+                  description: 'Default value if the variable cannot be resolved',
+                  default: 0,
+                },
+              },
+              required: ['name', 'value'],
+            },
+          },
+          constants: {
+            title: 'Built-in Constants',
+            type: 'object',
+            description: 'Access built-in constants like PI, E in all calculations',
+            properties: {
+              usePi: {
+                type: 'boolean',
+                title: 'Include PI (3.14159...)',
+                default: false,
+              },
+              useE: {
+                type: 'boolean', 
+                title: 'Include E (2.71828...)',
+                default: false,
+              },
+            },
+          },
+          outputFormat: {
+            title: 'Output Format',
+            type: 'string',
+            enum: ['individual', 'combined', 'both'],
+            default: 'individual',
+            description: 'How to store results: individual variables, combined object, or both',
+          },
+          appendToGlobal: {
+            title: 'Append To Global Return',
+            type: 'boolean',
+            default: true,
+            description: 'Whether to include results in the global return object',
+          },
+          terminateOnError: {
+            title: 'Terminate On Error',
+            type: 'boolean',
+            default: false,
+            description: 'Whether to stop execution if any calculation fails (false = skip failed calculations)',
+          },
+          enableConditions: {
+            title: 'Enable Conditional Calculations',
+            type: 'boolean',
+            default: false,
+            description: 'Allow calculations to have conditions that must be met',
+          },
+        },
+        required: ['name', 'calculations'],
+      },
+      process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
+        try {
+          // Helper function to safely parse numbers
+          const parseNumber = (value, defaultValue = 0) => {
+            if (value === null || value === undefined || value === '') {
+              return defaultValue;
+            }
+            const num = parseFloat(value);
+            return isNaN(num) ? defaultValue : num;
+          };
+
+          // Helper function to evaluate conditions
+          const evaluateCondition = (condition, variables) => {
+            if (!condition || !process.enableConditions) return true;
+            
+            try {
+              // Replace variables in condition
+              let processedCondition = condition;
+              Object.keys(variables).forEach(varName => {
+                const regex = new RegExp(`\\b${varName}\\b`, 'g');
+                processedCondition = processedCondition.replace(regex, variables[varName]);
+              });
+
+              // Simple condition evaluation (supports >, <, >=, <=, ==, !=)
+              const conditionPattern = /^(.+?)\s*(>|<|>=|<=|==|!=)\s*(.+?)$/;
+              const match = processedCondition.match(conditionPattern);
+              
+              if (match) {
+                const [, left, operator, right] = match;
+                const leftVal = parseFloat(left);
+                const rightVal = parseFloat(right);
+                
+                switch (operator) {
+                  case '>': return leftVal > rightVal;
+                  case '<': return leftVal < rightVal;
+                  case '>=': return leftVal >= rightVal;
+                  case '<=': return leftVal <= rightVal;
+                  case '==': return leftVal === rightVal;
+                  case '!=': return leftVal !== rightVal;
+                  default: return true;
+                }
+              }
+              
+              return true;
+            } catch (error) {
+              console.warn('Failed to evaluate condition:', condition, error);
+              return true; // Default to true if condition can't be evaluated
+            }
+          };
+
+          // Initialize global variable context
+          const globalVariables = {};
+          
+          // Add built-in constants if requested
+          if (process.constants?.usePi) {
+            globalVariables.PI = Math.PI;
+          }
+          if (process.constants?.useE) {
+            globalVariables.E = Math.E;
+          }
+
+          // Process global variables
+          if (process.globalVariables && Array.isArray(process.globalVariables)) {
+            for (const variable of process.globalVariables) {
+              try {
+                const rawValue = retrieveBody(
+                  variable.from, 
+                  variable.value, 
+                  event, 
+                  globalObj, 
+                  paramState, 
+                  sessionKey, 
+                  process
+                );
+                globalVariables[variable.name] = parseNumber(rawValue, variable.defaultValue || 0);
+              } catch (error) {
+                console.warn(`Failed to resolve global variable ${variable.name}:`, error);
+                globalVariables[variable.name] = variable.defaultValue || 0;
+              }
+            }
+          }
+
+          // Store for calculation results (for cross-calculation references)
+          const calculationResults = {};
+
+                    // Enhanced math expression evaluator with functions
+          const evaluateExpression = (expr, vars) => {
+            // Replace variables in expression
+            let processedExpr = expr;
+            
+            // Replace variables
+            Object.keys(vars).forEach(varName => {
+              const regex = new RegExp(`\\b${varName}\\b`, 'g');
+              processedExpr = processedExpr.replace(regex, vars[varName]);
+            });
+
+            // Replace template variables that weren't in our variables object
+            processedExpr = processedExpr.replace(/\{\{([^}]+)\}\}/g, (match, varPath) => {
+              try {
+                const value = retrieveBody(null, match, event, globalObj, paramState, sessionKey, process);
+                return parseNumber(value, 0);
+              } catch {
+                return 0;
+              }
+            });
+
+            // Replace ^ with Math.pow for exponentiation
+            processedExpr = processedExpr.replace(/(\d+(?:\.\d+)?|\([^)]+\))\s*\^\s*(\d+(?:\.\d+)?|\([^)]+\))/g, 'Math.pow($1, $2)');
+
+            // Replace math functions
+            const mathFunctions = {
+              'sqrt': 'Math.sqrt',
+              'abs': 'Math.abs', 
+              'round': 'Math.round',
+              'ceil': 'Math.ceil',
+              'floor': 'Math.floor',
+              'sin': 'Math.sin',
+              'cos': 'Math.cos',
+              'tan': 'Math.tan',
+              'log': 'Math.log10',
+              'ln': 'Math.log',
+            };
+
+            Object.keys(mathFunctions).forEach(func => {
+              const regex = new RegExp(`\\b${func}\\s*\\(`, 'g');
+              processedExpr = processedExpr.replace(regex, `${mathFunctions[func]}(`);
+            });
+
+            // Handle special functions that need custom logic
+            // min() and max() for multiple arguments
+            processedExpr = processedExpr.replace(/\bmin\s*\(([^)]+)\)/g, (match, args) => {
+              return `Math.min(${args})`;
+            });
+            
+            processedExpr = processedExpr.replace(/\bmax\s*\(([^)]+)\)/g, (match, args) => {
+              return `Math.max(${args})`;
+            });
+
+            // avg() function - custom implementation
+            processedExpr = processedExpr.replace(/\bavg\s*\(([^)]+)\)/g, (match, args) => {
+              const values = args.split(',').map(v => v.trim());
+              return `((${args}) / ${values.length})`;
+            });
+
+            // Validate expression safety (only allow numbers, operators, Math functions, parentheses)
+            const safeExprPattern = /^[\d\s+\-*/%().,^Math\.a-zA-Z_]+$/;
+            if (!safeExprPattern.test(processedExpr)) {
+              throw new Error('Invalid characters in math expression');
+            }
+
+            // Evaluate the expression safely
+            try {
+              // Use Function constructor for safer evaluation than eval
+              const result = new Function('Math', `"use strict"; return (${processedExpr});`)(Math);
+              
+              if (typeof result !== 'number' || !isFinite(result)) {
+                throw new Error('Expression did not evaluate to a valid number');
+              }
+              
+              return result;
+            } catch (error) {
+              throw new Error(`Math evaluation failed: ${error.message}`);
+            }
+          };
+
+          // Process all calculations
+          const results = {};
+          const errors = [];
+          let successCount = 0;
+
+          if (!process.calculations || !Array.isArray(process.calculations)) {
+            throw new Error('No calculations provided');
+          }
+
+          for (let i = 0; i < process.calculations.length; i++) {
+            const calculation = process.calculations[i];
+            
+            try {
+              // Build variable context for this calculation
+              const calculationVariables = { ...globalVariables };
+              
+              // Add variables specific to this calculation
+              if (calculation.variables && Array.isArray(calculation.variables)) {
+                for (const variable of calculation.variables) {
+                  try {
+                    let rawValue;
+                    
+                    // Handle special 'calculation' source type for cross-calculation references
+                    if (variable.from === 'calculation') {
+                      // Parse calculation reference like "{{calc.bmi}}" or just "bmi"
+                      const calcRef = variable.value.replace(/\{\{calc\.(.+?)\}\}/, '$1').replace(/\{\{(.+?)\}\}/, '$1');
+                      rawValue = calculationResults[calcRef];
+                      if (rawValue === undefined) {
+                        throw new Error(`Referenced calculation '${calcRef}' not found or not yet calculated`);
+                      }
+                    } else {
+                      rawValue = retrieveBody(
+                        variable.from, 
+                        variable.value, 
+                        event, 
+                        globalObj, 
+                        paramState, 
+                        sessionKey, 
+                        process
+                      );
+                    }
+                    
+                    calculationVariables[variable.name] = parseNumber(rawValue, variable.defaultValue || 0);
+                  } catch (error) {
+                    console.warn(`Failed to resolve variable ${variable.name} in calculation ${calculation.name}:`, error);
+                    calculationVariables[variable.name] = variable.defaultValue || 0;
+                  }
+                }
+              }
+
+              // Check condition if enabled
+              if (!evaluateCondition(calculation.condition, calculationVariables)) {
+                continue;
+              }
+
+              // Evaluate the expression
+              const result = evaluateExpression(calculation.expression, calculationVariables);
+
+              // Apply precision if specified
+              let finalResult = result;
+              if (calculation.precision !== undefined && calculation.precision >= 0) {
+                finalResult = parseFloat(result.toFixed(calculation.precision));
+              }
+
+              // Store result
+              results[calculation.name] = finalResult;
+              calculationResults[calculation.name] = finalResult; // For cross-calculation references
+              successCount++;
+
+
+            } catch (error) {
+              const errorMessage = `Calculation '${calculation.name}' failed: ${error.message}`;
+              console.error(errorMessage);
+              errors.push({ name: calculation.name, error: errorMessage });
+              
+              if (process.terminateOnError) {
+                throw new Error(errorMessage);
+              }
+            }
+          }
+
+          // Store results based on output format
+          if (process.appendToGlobal !== false) {
+            switch (process.outputFormat) {
+              case 'individual':
+                // Store each result as a separate global variable
+                Object.keys(results).forEach(key => {
+                  globalObj[key] = results[key];
+                });
+                break;
+              
+              case 'combined':
+                // Store all results in a single object
+                globalObj[process.name] = results;
+                break;
+              
+              case 'both':
+              default:
+                // Store both individual and combined
+                Object.keys(results).forEach(key => {
+                  globalObj[key] = results[key];
+                });
+                globalObj[process.name] = results;
+                break;
+            }
+          }
+
+          // Log summary
+          
+          if (errors.length > 0) {
+            globalErrors[process.name] = errors;
+            console.warn(`Math step '${process.name}' had ${errors.length} failed calculations:`, errors);
+          }
+
+        } catch (error) {
+          const errorMessage = `Math step '${process.name}' failed: ${error.message}`;
+          console.error(errorMessage);
+          globalErrors[process.name] = errorMessage;
+          
+          if (process.terminateOnError !== false) {
+            throw new Error(errorMessage);
+          }
         }
       },
     },

@@ -6,8 +6,9 @@ import { TbEditCircleOff } from 'react-icons/tb';
 
 const VirtualElementWrapper = ({ children, style, editMode }) => {
   return (
-    <>{children}
-     {/* 
+    <>
+      {children}
+      {/* 
       {editMode ? (
         <Tooltip mouseEnterDelay={0.3}>
           <div

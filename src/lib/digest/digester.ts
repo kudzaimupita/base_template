@@ -64,11 +64,11 @@ class MessageLogger {
       level,
       message,
       context: this.sanitizeContext(context),
-      stack: level === 'error' ? new Error().stack : null
+      stack: level === 'error' ? new Error().stack : null,
     };
 
     this.messages.push(logEntry);
-    
+
     // Maintain max messages limit
     if (this.messages.length > this.maxMessages) {
       this.messages = this.messages.slice(-this.maxMessages);
@@ -112,7 +112,7 @@ class MessageLogger {
       ...context,
       operationType: operation.type,
       operationId: operation.id,
-      phase
+      phase,
     });
   }
 
@@ -122,7 +122,7 @@ class MessageLogger {
     return this.info(message, {
       ...context,
       controllerPlugins: controller?.plugins?.length || 0,
-      phase
+      phase,
     });
   }
 
@@ -134,7 +134,7 @@ class MessageLogger {
       path,
       oldValue: this.sanitizeValue(oldValue),
       newValue: this.sanitizeValue(newValue),
-      type: 'state_change'
+      type: 'state_change',
     });
   }
 
@@ -143,19 +143,18 @@ class MessageLogger {
     let filtered = this.messages;
 
     if (filters.level) {
-      filtered = filtered.filter(msg => msg.level === filters.level);
+      filtered = filtered.filter((msg) => msg.level === filters.level);
     }
 
     if (filters.since) {
       const since = new Date(filters.since);
-      filtered = filtered.filter(msg => new Date(msg.timestamp) >= since);
+      filtered = filtered.filter((msg) => new Date(msg.timestamp) >= since);
     }
 
     if (filters.search) {
       const search = filters.search.toLowerCase();
-      filtered = filtered.filter(msg => 
-        msg.message.toLowerCase().includes(search) ||
-        JSON.stringify(msg.context).toLowerCase().includes(search)
+      filtered = filtered.filter(
+        (msg) => msg.message.toLowerCase().includes(search) || JSON.stringify(msg.context).toLowerCase().includes(search)
       );
     }
 
@@ -199,7 +198,7 @@ class MessageLogger {
     return {
       messages: this.messages,
       timestamp: new Date().toISOString(),
-      count: this.messages.length
+      count: this.messages.length,
     };
   }
 
@@ -209,22 +208,19 @@ class MessageLogger {
   }
 
   notifySubscribers(logEntry) {
-    this.subscribers.forEach(callback => {
+    this.subscribers.forEach((callback) => {
       try {
         callback(logEntry);
       } catch (error) {
-        // 
+        //
       }
     });
   }
 
   consoleOutput(logEntry) {
     const style = this.getConsoleStyle(logEntry.level);
-    const contextStr = Object.keys(logEntry.context).length > 0 
-      ? `\nContext: ${JSON.stringify(logEntry.context, null, 2)}` 
-      : '';
-    
-
+    const contextStr =
+      Object.keys(logEntry.context).length > 0 ? `\nContext: ${JSON.stringify(logEntry.context, null, 2)}` : '';
   }
 
   getConsoleStyle(level) {
@@ -233,7 +229,7 @@ class MessageLogger {
       warn: 'color: #ffaa00; font-weight: bold;',
       info: 'color: #4488ff;',
       debug: 'color: #888888;',
-      success: 'color: #44ff44; font-weight: bold;'
+      success: 'color: #44ff44; font-weight: bold;',
     };
     return styles[level] || 'color: #000000;';
   }
@@ -273,7 +269,6 @@ class MessageLogger {
   }
 }
 
-
 const messageLogger = new MessageLogger();
 
 class StateManager {
@@ -291,13 +286,13 @@ class StateManager {
     this.log = {};
     this.stateCache.clear();
     this.cacheVersion++;
-    
+
     messageLogger.info('StateManager reset');
   }
 
   getState() {
     const cacheKey = `${this.cacheVersion}-${Object.keys(this.obj).length}-${Object.keys(this.errors).length}`;
-    
+
     if (this.stateCache.has(cacheKey)) {
       return this.stateCache.get(cacheKey);
     }
@@ -306,15 +301,15 @@ class StateManager {
       data: memoizedDotNotation(this.obj),
       errors: memoizedDotNotation(this.errors),
     };
-    
+
     this.stateCache.set(cacheKey, state);
-    
+
     // Clear cache periodically
     if (this.stateCache.size > 50) {
       const keys = Array.from(this.stateCache.keys());
-      keys.slice(0, 25).forEach(key => this.stateCache.delete(key));
+      keys.slice(0, 25).forEach((key) => this.stateCache.delete(key));
     }
-    
+
     return state;
   }
 
@@ -323,10 +318,10 @@ class StateManager {
     _.set(this.obj, path, value);
     this.stateCache.clear(); // Invalidate cache
     this.cacheVersion++;
-    
+
     messageLogger.debug(`State changed: ${path}`, {
       path,
-      type: 'state_change'
+      type: 'state_change',
     });
   }
 
@@ -334,11 +329,11 @@ class StateManager {
     _.set(this.errors, path, error);
     this.stateCache.clear(); // Invalidate cache
     this.cacheVersion++;
-    
+
     messageLogger.error(`State error at ${path}`, {
       path,
       error: error.message || error,
-      type: 'state_error'
+      type: 'state_error',
     });
   }
 }
@@ -349,28 +344,26 @@ export const findOperation = (type) => {
   if (operationsCache.has(type)) {
     return operationsCache.get(type);
   }
-  
+
   const operations = getOperations();
   const op = operations.find((item) => item?.key === type);
-  
+
   if (op) {
     operationsCache.set(type, op);
   }
-  
+
   return op;
 };
 
 export async function processBatch(items, batchSize, processor) {
   const results = [];
-  
+
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.all(
-      batch.map((item, index) => processor(item, i + index))
-    );
+    const batchResults = await Promise.all(batch.map((item, index) => processor(item, i + index)));
     results.push(...batchResults);
   }
-  
+
   return results;
 }
 
@@ -401,8 +394,6 @@ export class Semaphore {
     }
   }
 }
-
-
 
 export const getPerformanceMetrics = () => ({
   operationsCacheSize: operationsCache.size,
@@ -441,7 +432,7 @@ export const processHit = async (
   config
 ) => {
   const startTime = performance.now();
-  
+
   try {
     const op = findOperation(process.type);
     if (!op) {
@@ -449,7 +440,9 @@ export const processHit = async (
       throw error;
     }
 
+    // Remove automatic sessionKey prefixing - let users control localStorage keys directly
     const sessionKey = `${applicationId}-sessionInfo`;
+
 
     const result = await op.process(
       {
@@ -479,13 +472,14 @@ export const processHit = async (
     );
 
     const duration = performance.now() - startTime;
-    
-    if (duration > 100) { // Only log slow operations
+
+    if (duration > 100) {
+      // Only log slow operations
       messageLogger.warn(`Slow operation detected`, {
         operationType: process.type,
         duration: `${duration.toFixed(2)}ms`,
         compId,
-        pageId
+        pageId,
       });
     }
 
@@ -495,7 +489,7 @@ export const processHit = async (
       operationType: process.type,
       error: error.message,
       compId,
-      pageId
+      pageId,
     });
     throw error;
   }
@@ -552,14 +546,13 @@ export const executeProcess = async (
       editMode,
       config
     );
-    message.info(`Process executed successfully at step ${index}`)
+    message.info(`Process executed successfully at step ${index}`);
   } catch (error) {
-
     messageLogger.error(`Process execution failed at step ${index}`, {
       index,
       operation: item?.type,
       operationId: item?.id,
-      error: error.message
+      error: error.message,
     });
     throw error;
   }
@@ -580,7 +573,7 @@ export const processController = async (
   config
 ) => {
   const startTime = performance.now();
-  
+
   stateManager.reset();
   const plugins = controllerToExecute?.plugins || [];
 
@@ -621,14 +614,15 @@ export const processController = async (
     );
 
     tempStore.storeResult(controllerKey, result);
-    
+
     const duration = performance.now() - startTime;
-    
-    if (duration > 500) { // Log slow controllers
+
+    if (duration > 500) {
+      // Log slow controllers
       messageLogger.warn(`Slow controller execution`, {
         controllerKey,
         duration: `${duration.toFixed(2)}ms`,
-        pluginCount: plugins.length
+        pluginCount: plugins.length,
       });
     }
 
@@ -636,7 +630,7 @@ export const processController = async (
   } catch (error) {
     messageLogger.error('Process controller error', {
       controllerKey,
-      error: error.message
+      error: error.message,
     });
 
     tempStore.storeResult(controllerKey, { error: error.message });

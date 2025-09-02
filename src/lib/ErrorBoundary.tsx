@@ -6,7 +6,10 @@ interface ErrorBoundaryProps {
   onDOMError?: () => void; // Callback to trigger DOM reload/refresh
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; error: any; errorInfo: any; autoRecovering: boolean }> {
+class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  { hasError: boolean; error: any; errorInfo: any; autoRecovering: boolean }
+> {
   private recoveryTimeout: NodeJS.Timeout | null = null;
 
   constructor(props) {
@@ -26,7 +29,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
 
   componentDidCatch(error, errorInfo) {
     // You can log the error to an error reporting service
-    
+
     this.setState({
       error: error,
       errorInfo: errorInfo,
@@ -34,7 +37,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
 
     // Check if this is a DOM manipulation error that we can recover from
     const isDOMError = this.isDOMManipulationError(error);
-    
+
     if (isDOMError) {
       this.attemptAutoRecovery();
     }
@@ -45,7 +48,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
 
   isDOMManipulationError = (error) => {
     if (!error || !error.message) return false;
-    
+
     const domErrorPatterns = [
       /Failed to execute 'removeChild' on 'Node'/i,
       /The node to be removed is not a child of this node/i,
@@ -55,12 +58,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
       /Cannot read properties of null/i,
     ];
 
-    return domErrorPatterns.some(pattern => pattern.test(error.message));
+    return domErrorPatterns.some((pattern) => pattern.test(error.message));
   };
 
   attemptAutoRecovery = () => {
     this.setState({ autoRecovering: true });
-    
+
     // Clear any existing recovery timeout
     if (this.recoveryTimeout) {
       clearTimeout(this.recoveryTimeout);
@@ -69,7 +72,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
     // Try to recover after a short delay
     this.recoveryTimeout = setTimeout(() => {
       try {
-        
         // Call the parent's DOM error handler if provided
         if (this.props.onDOMError && typeof this.props.onDOMError === 'function') {
           this.props.onDOMError();
@@ -77,7 +79,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
 
         // Clean up any problematic DOM elements
         this.cleanupProblematicDOMElements();
-        
+
         // Reset error state to try rendering again
         this.setState({
           hasError: false,
@@ -85,9 +87,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
           errorInfo: null,
           autoRecovering: false,
         });
-        
       } catch (recoveryError) {
-        
         this.setState({ autoRecovering: false });
       }
     }, 500); // Give DOM time to settle
@@ -97,21 +97,18 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
     try {
       // Remove any orphaned elements that might be causing issues
       const orphanedElements = document.querySelectorAll('[data-sortable-orphan]');
-      orphanedElements.forEach(el => {
+      orphanedElements.forEach((el) => {
         try {
           el.remove();
-        } catch (e) {
-          
-        }
+        } catch (e) {}
       });
 
       // Clean up duplicate IDs that might cause conflicts
       const seenIds = new Set();
       const elementsWithIds = document.querySelectorAll('[id]');
-      
-      elementsWithIds.forEach(element => {
+
+      elementsWithIds.forEach((element) => {
         if (element.id && seenIds.has(element.id)) {
-          
           try {
             // Mark for removal instead of removing immediately
             element.setAttribute('data-sortable-orphan', 'true');
@@ -121,13 +118,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
                 if (element.parentNode) {
                   element.remove();
                 }
-              } catch (e) {
-                
-              }
+              } catch (e) {}
             }, 0);
-          } catch (e) {
-            
-          }
+          } catch (e) {}
         } else if (element.id) {
           seenIds.add(element.id);
         }
@@ -137,10 +130,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
       if (window.gc && typeof window.gc === 'function') {
         setTimeout(() => window.gc(), 100);
       }
-
-    } catch (cleanupError) {
-      
-    }
+    } catch (cleanupError) {}
   };
 
   componentWillUnmount() {
@@ -150,14 +140,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
   }
 
   handleManualRetry = () => {
-
     this.attemptAutoRecovery();
   };
 
   render() {
     if (this.state.hasError) {
       const isDOMError = this.isDOMManipulationError(this.state.error);
-      
+
       // You can render any custom fallback UI
       return (
         <div className="error-boundary-fallback zoomed6">
@@ -171,9 +160,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
               <h5>Something went wrong</h5>
               {isDOMError && (
                 <div className="dom-error-info">
-                  <p>⚠️ Detected a DOM synchronization error. This usually happens when drag-and-drop operations conflict with React updates.</p>
-                  <button 
-                    onClick={this.handleManualRetry}
+                  <p>
+                    ⚠️ Detected a DOM synchronization error. This usually happens when drag-and-drop operations conflict with
+                    React updates.
+                  </p>
+                  <button
                     className="retry-button"
                     style={{
                       padding: '8px 16px',
@@ -182,8 +173,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean; e
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     }}
+                    onClick={this.handleManualRetry}
                   >
                     🔄 Try Again
                   </button>

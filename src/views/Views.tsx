@@ -5,30 +5,37 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { ConfigProvider } from 'antd';
 import ElementRenderer from '../lib/RenderElements';
-import appConfig from '../../appConfig.json';
 import components from '../../components.json';
 import { setAppStatePartial } from '@/store/slices/appState';
 import { storeInvocation } from '@/services/invocationService';
 
 
 const Views = () => {
-  // const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const params = useParams();
+  
+  // Get current app from Redux store
+  const appConfig = useSelector((state: any) => state.currentApp?.currentApplication);
+  const appState = useSelector((state: any) => state.appState);
+
   useEffect(() => {
     // Set document title from config
-    if (appConfig?.title || appConfig.name) {
-      document.title = appConfig?.title || appConfig.name;
+    if (appConfig?.title || appConfig?.name) {
+      document.title = appConfig?.title || appConfig?.name;
     }
 
     // Set favicon from base64 config
-    if (appConfig.icon) {
-      const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+    if (appConfig?.icon) {
+      const link = (document.querySelector("link[rel~='icon']") || document.createElement('link')) as HTMLLinkElement;
       link.type = 'image/png';
       link.rel = 'icon';
       link.href = appConfig?.icon || '';
       document.getElementsByTagName('head')[0].appendChild(link);
     }
-  }, []);
-  const getDefaultPage = (appConfig) => {
+  }, [appConfig]);
+  
+  const getDefaultPage = (appConfig: any) => {
     // Guard clause for missing appConfig
     if (!appConfig?.views?.length) {
       return {};
@@ -46,11 +53,8 @@ const Views = () => {
     // If no defaultPrivatePage is set, use first view
     return appConfig.views[0];
   };
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const params = useParams();
+  
   const defaultPage = getDefaultPage(appConfig);
-  const appState = useSelector((state) => state.appState);
   return (
     <Suspense fallback={<div className="bg-transparent">{/* <ModernSpinner /> */}</div>}>
       <ConfigProvider
@@ -71,7 +75,7 @@ const Views = () => {
             // const routeParams = (route?.params?.length ?? 0) > 0 ? `/${route.params?.join('/') ?? ''}` : '';
             return (
               <Route
-                key={`${route.id}`}
+                // key={`${route.id}`}
                 path={`/${route.id}`}
                 element={
                   <
