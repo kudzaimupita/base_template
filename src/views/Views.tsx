@@ -11,6 +11,8 @@ import { storeInvocation } from '@/services/invocationService';
 
 
 const Views = () => {
+  console.log('🚀 Views component initializing...');
+  
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const params = useParams();
@@ -19,42 +21,77 @@ const Views = () => {
   const appConfig = useSelector((state: any) => state.currentApp?.currentApplication);
   const appState = useSelector((state: any) => state.appState);
 
+  console.log('📊 Views - Redux State:', {
+    appConfig,
+    appState,
+    params,
+    currentAppSlice: useSelector((state: any) => state.currentApp)
+  });
+
   useEffect(() => {
+    console.log('🔧 Views useEffect triggered with appConfig:', appConfig);
+    
     // Set document title from config
     if (appConfig?.title || appConfig?.name) {
-      document.title = appConfig?.title || appConfig?.name;
+      const title = appConfig?.title || appConfig?.name;
+      console.log('📝 Setting document title to:', title);
+      document.title = title;
+    } else {
+      console.log('⚠️ No title found in appConfig');
     }
 
     // Set favicon from base64 config
     if (appConfig?.icon) {
+      console.log('🎨 Setting favicon from appConfig.icon');
       const link = (document.querySelector("link[rel~='icon']") || document.createElement('link')) as HTMLLinkElement;
       link.type = 'image/png';
       link.rel = 'icon';
       link.href = appConfig?.icon || '';
       document.getElementsByTagName('head')[0].appendChild(link);
+    } else {
+      console.log('⚠️ No icon found in appConfig');
     }
   }, [appConfig]);
   
   const getDefaultPage = (appConfig: any) => {
+    console.log('🏠 Getting default page from appConfig:', appConfig);
+    
     // Guard clause for missing appConfig
     if (!appConfig?.views?.length) {
+      console.log('❌ No views found in appConfig, returning empty object');
       return {};
     }
 
+    console.log('📄 Available views:', appConfig.views.map((v: any) => ({ id: v.id, name: v.name })));
+
     const defaultPageId = appConfig?.layoutSettings?.defaultPrivatePage;
+    console.log('🎯 Default page ID from settings:', defaultPageId);
 
     // If defaultPrivatePage is set, try to find that view
     if (defaultPageId) {
-      const specifiedPage = appConfig.views.find((view) => view.id === defaultPageId);
+      const specifiedPage = appConfig.views.find((view: any) => view.id === defaultPageId);
+      console.log('🔍 Found specified page:', specifiedPage);
       // Return found page or fallback to first view
-      return specifiedPage || appConfig.views[0];
+      const result = specifiedPage || appConfig.views[0];
+      console.log('✅ Using specified/fallback page:', result);
+      return result;
     }
 
     // If no defaultPrivatePage is set, use first view
-    return appConfig.views[0];
+    const firstView = appConfig.views[0];
+    console.log('✅ Using first view as default:', firstView);
+    return firstView;
   };
   
   const defaultPage = getDefaultPage(appConfig);
+  console.log('🏠 Final default page:', defaultPage);
+  console.log('🎨 Views rendering with:', {
+    appConfigViews: appConfig?.views?.length || 0,
+    defaultPageId: defaultPage?.id,
+    hasComponents: !!components,
+    appStateKeys: Object.keys(appState || {})
+  });
+
   return (
     <Suspense fallback={<div className="bg-transparent">{/* <ModernSpinner /> */}</div>}>
       <ConfigProvider
@@ -70,13 +107,21 @@ const Views = () => {
         }}
       >
         <Routes>
-          {appConfig.views?.map((route) => {
+          {appConfig?.views?.map((route: any) => {
             const propsData = appState?.[route?.id] || {};
-            // const routeParams = (route?.params?.length ?? 0) > 0 ? `/${route.params?.join('/') ?? ''}` : '';
-            return (
-              <Route
-                // key={`${route.id}`}
-                path={`/${route.id}`}
+            console.log(`🛣️ Creating route for ${route?.id}:`, {
+              routeId: route?.id,
+              routeName: route?.name,
+              hasLayout: !!route?.layout,
+              layoutLength: route?.layout?.length || 0,
+              propsData,
+              hasStyle: !!route?.style
+            });
+            
+                          return (
+                <Route
+                  key={`${route.id}`}
+                  path={`/${route.id}`}
                 element={
                   <
                   >
@@ -114,8 +159,13 @@ const Views = () => {
           <Route
             path="/"
             element={
-              <
-              >
+              <>
+                {console.log('🏠 Rendering default route with:', {
+                  defaultPageId: defaultPage?.id,
+                  hasLayout: !!defaultPage?.layout,
+                  layoutLength: defaultPage?.layout?.length || 0,
+                  propsData: appState?.[defaultPage?.id]
+                })}
                 <ElementRenderer
                   params={params}
                   allComponentsRaw={components || []}
