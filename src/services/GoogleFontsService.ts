@@ -62,14 +62,14 @@ class GoogleFontsService {
       await this.preloadAllFonts();
       
       this.initialized = true;
-      message.success(`Loaded ${this.fonts.length} Google Fonts for styling`);
+    //   message.success(`Loaded ${this.fonts.length} Google Fonts for styling`);
   
     } catch (error) {
       // Use fallback font list if API fails
       this.useFallbackFonts();
       // Still load fallback fonts
       await this.preloadAllFonts();
-      message.warning('Google Fonts API unavailable, using fallback fonts');
+    //   message.warning('Google Fonts API unavailable, using fallback fonts');
     }
   }
 
