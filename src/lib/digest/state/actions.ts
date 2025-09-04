@@ -8295,7 +8295,7 @@ return '';  // Return value will be stored in state if storeResult is true`,
                 return migratedCount;
               }
             },
-
+document,
             // LAYOUT AND POSITIONING UTILITIES
             layout: {
               // Get element bounds and position
@@ -9847,7 +9847,24 @@ return '';  // Return value will be stored in state if storeResult is true`,
               http: {
                 // Global configuration
                 config: {
-                  baseURL: '',
+                  get baseURL() {
+                    // Get current app ID from store
+                    let appId = 'default';
+                    try {
+                      if (process.store) {
+                        const rootState = process.store.getState();
+                        const currentApplication = rootState.currentAppState?.currentApplication;
+                        if (currentApplication?._id) {
+                          appId = currentApplication._id;
+                        }
+                      }
+                    } catch (error) {
+                      console.warn('Could not get app ID from store, using default:', error);
+                    }
+                    
+                    const environment = import.meta.env.VITE_ISDEPLOYED ? 'production' : 'development';
+                    return `${import.meta.env.VITE_CLIENT_API_URL}/v1/apps/${environment}/${appId}`;
+                  },
                   timeout: 10000,
                   headers: {
                     'Content-Type': 'application/json',
