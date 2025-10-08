@@ -282,12 +282,36 @@ export function logJsonDebug(
   const state = sessionKey ? localStorage.getItem(sessionKey) : null;
   const parsedState = state ? tryParseJSON(state) : {};
 
-  // Build localStorage data from all available keys for debugging
+  // Build localStorage data from all available keys for debugging (filtered to hide system keys)
   const localStorageData = {};
+  
+  // System keys to hide from debug console
+  const hiddenKeys = [
+    'googleFontsCache',
+    'googleFontsCacheExpiry',
+    'admin',
+    'user',
+    'accessToken',
+    'refreshToken',
+    'errorReports'
+  ];
+  
+  // Patterns to hide (keys that start with these)
+  const hiddenPatterns = [
+    'vscode-tabs-',
+    'panelSizes_'
+  ];
+  
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key) {
+        // Skip if key is in hidden list
+        if (hiddenKeys.includes(key)) continue;
+        
+        // Skip if key matches any hidden pattern
+        if (hiddenPatterns.some(pattern => key.startsWith(pattern))) continue;
+        
         try {
           const value = localStorage.getItem(key);
           localStorageData[key] = value ? JSON.parse(value) : value;
@@ -302,18 +326,61 @@ export function logJsonDebug(
 
   function getCircularReplacer() {
     const seen = new WeakSet();
+    const depthMap = new WeakMap();
+    const MAX_DEPTH = 10;
+    
     return (key, value) => {
-      if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
-          return '[Circular Reference]';
-        }
-        seen.add(value);
+      if (value === null || value === undefined) {
+        return value;
       }
+      
+      if (typeof value !== 'object') {
+        return value;
+      }
+      
+      if (seen.has(value)) {
+        return '[Circular Reference]';
+      }
+      
+      const currentDepth = depthMap.get(value) || 0;
+      if (currentDepth > MAX_DEPTH) {
+        return '[Max Depth Exceeded]';
+      }
+      
+      if (value instanceof Error) {
+        return {
+          name: value.name,
+          message: value.message,
+          stack: value.stack
+        };
+      }
+      
+      if (value instanceof Event || value instanceof Node) {
+        return '[DOM Object]';
+      }
+      
+      if (typeof value === 'function') {
+        return '[Function]';
+      }
+      
+      seen.add(value);
+      depthMap.set(value, currentDepth + 1);
+      
       return value;
     };
   }
 
-  const stringified = JSON.stringify(event, getCircularReplacer());
+  let stringified;
+  try {
+    stringified = JSON.stringify(event, getCircularReplacer());
+  } catch (error) {
+    console.error('Failed to stringify event in debug:', error);
+    stringified = JSON.stringify({
+      type: event?.type || 'unknown',
+      timestamp: Date.now(),
+      error: 'Debug serialization failed'
+    });
+  }
 
   const debugData = {
     controller: globalObj,

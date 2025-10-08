@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Activity, MousePointer, Zap, Database, Loader2, ArrowRight, Eye, Settings, Globe, Timer, Users, FileText, ShoppingCart, Target, RefreshCw, Play, Component, Code, RotateCw, CheckCircle, Send, Edit3, Lock, Layers, Info, EyeOff } from 'lucide-react';
-// import ControllerSelect from '@/components/shared/SchemaForm/Fields/ControllerField';
-// import EventHandlerField from '@/components/shared/SchemaForm/Fields/EventHandler';
+import ControllerSelect from '@/components/shared/SchemaForm/Fields/ControllerField';
+import EventHandlerField from '@/components/shared/SchemaForm/Fields/EventHandler';
 import { Form, Select } from 'antd';
 
 // Global state manager to handle both hover and pinned elements
@@ -458,7 +458,18 @@ const EditableDebugOperations = ({ operations, context, onOperationChange }) => 
             {operation.name}
           </div>
           
-   
+          {operation.type === 'controller-invoke' && (
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-neutral-400 block mb-1">Controller:</label>
+                <ControllerSelect
+                  value={operation.controller}
+                  onChange={(value) => handleControllerChange(index, value)}
+                  placeholder="Select controller..."
+                />
+              </div>
+            </div>
+          )}
           
           {operation.type === 'set-state' && (
             <div className="space-y-2">
@@ -1084,7 +1095,7 @@ const DebugWrapper = ({
           }}
         >
           <div className="max-w-sm">
-            <div className={`bg-neutral-900 rounded-lg shadow-2xl p-3 backdrop-blur-sm bg-opacity-95 ${
+            <div className={`bg-[#202020] rounded-lg shadow-2xl p-3 backdrop-blur-sm bg-opacity-95 ${
               isSelected 
                 ? 'border-2 border-yellow-400/70 shadow-yellow-400/20' 
                 : 'border border-purple-500/50'

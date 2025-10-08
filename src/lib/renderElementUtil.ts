@@ -624,12 +624,46 @@ const renderElementUtil = (
    */
   const setCurrentItemForElement = (elementId) => {
     if (process?.currentItem && setAppStatePartial) {
+      // Instead of storing the actual data item, store a dynamic reference
+      const dynamicReference = {
+        ...process.currentItem,
+        // Add metadata for dynamic resolution
+        __dynamicIndex: process?.currentIndex,
+        __dynamicDataKey: process?.propsMapper?.dynamicDataKey,
+        __isVirtualElement: true,
+        __lastUpdated: Date.now(), // Add timestamp for change detection
+      }; 
+      console.log(elementId,'dynamicReference', dynamicReference)
       dispatch(
         setAppStatePartial({
           key: elementId,
-          payload: process.currentItem,
+          payload: dynamicReference,
         })
       );
+    }
+  };
+
+  // Add a function to refresh virtual element data
+  const refreshVirtualElementData = (elementId, currentData) => {
+    if (setAppStatePartial && currentData) {
+      const existingState = appState?.[elementId];
+      if (existingState?.__isVirtualElement) {
+        const refreshedReference = {
+          ...currentData,
+          // Preserve metadata
+          __dynamicIndex: existingState.__dynamicIndex,
+          __dynamicDataKey: existingState.__dynamicDataKey,
+          __isVirtualElement: true,
+          __lastUpdated: Date.now(),
+        };
+        console.log(`🔄 Refreshing virtual element [${elementId}]:`, refreshedReference);
+        dispatch(
+          setAppStatePartial({
+            key: elementId,
+            payload: refreshedReference,
+          })
+        );
+      }
     }
   };
 

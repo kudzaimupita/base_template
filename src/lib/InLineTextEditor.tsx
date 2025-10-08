@@ -79,6 +79,11 @@ const InlineEditText: React.FC<IInlineEditText> = ({
   // Handle click outside to exit edit mode
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Don't handle right-click events as they are for context menus
+      if (event.button === 2) {
+        return;
+      }
+      
       if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
         handleSave();
       }
@@ -104,7 +109,12 @@ const InlineEditText: React.FC<IInlineEditText> = ({
     setText(initialText || '');
   };
 
-  const handleClick = () => {
+  const handleClick = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    // Don't enter edit mode on right-click (context menu)
+    if (e && 'button' in e && (e.button === 2 || e.type === 'contextmenu')) {
+      return;
+    }
+    
     if (!isEditing && isEditable) {
       setIsEditing(true);
     }
@@ -141,28 +151,28 @@ const InlineEditText: React.FC<IInlineEditText> = ({
 
   const sharedStyles: CSSProperties = {
     ...customStyles,
-    ...overRideStyles,
     minWidth,
     maxWidth,
     width: lineType === 'inline' ? inputWidth : '100%',
     verticalAlign: 'baseline',
+    ...overRideStyles,
   };
 
   const editingStyles: CSSProperties = {
     ...sharedStyles,
     display: 'inline-block',
-    outline: '1px solid rgb(64, 64, 64)',
-    outlineOffset: '0px',
-    borderRadius: '1px',
-    padding: '1px 3px',
+    border: '1px solid rgb(64, 64, 64)',
+    borderRadius: '4px',
+    padding: '2px 4px',
     backgroundColor: 'rgb(38, 38, 38)',
     color: 'rgb(245, 245, 245)',
     transition: 'all 0.2s ease',
+    boxSizing: 'border-box',
   };
 
   const displayStyles: CSSProperties = {
     ...sharedStyles,
-    display: lineType === 'multiple' ? 'block' : 'inline',
+    display: lineType === 'multiple' ? 'block' : 'inline-block',
     cursor: isEditable ? 'pointer' : 'default',
     transition: 'all 0.2s ease',
     textDecoration: underLineOnHover && isHover ? 'underline' : 'none',
@@ -170,6 +180,7 @@ const InlineEditText: React.FC<IInlineEditText> = ({
     minHeight: lineType === 'multiple' ? '3em' : 'auto',
     whiteSpace: lineType === 'multiple' ? 'pre-wrap' : 'nowrap',
     color: 'rgb(245, 245, 245)',
+    boxSizing: 'border-box',
   };
 
   // Apply overflow effect
@@ -177,6 +188,7 @@ const InlineEditText: React.FC<IInlineEditText> = ({
     displayStyles.overflow = 'hidden';
     displayStyles.textOverflow = 'ellipsis';
     displayStyles.whiteSpace = 'nowrap';
+    displayStyles.width = maxWidth;
   }
 
   const displayText = text || placeholder;
@@ -211,7 +223,7 @@ const InlineEditText: React.FC<IInlineEditText> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleClick();
+                handleClick(e);
               }
             }}
           >
@@ -230,7 +242,7 @@ const InlineEditText: React.FC<IInlineEditText> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleClick();
+                handleClick(e);
               }
             }}
           >

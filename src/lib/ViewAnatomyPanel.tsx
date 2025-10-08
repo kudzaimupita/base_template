@@ -33,7 +33,8 @@ import {
 } from 'lucide-react';
 
 interface ViewAnatomyPanelProps {
-  elements: any[];
+  elements?: any[];
+  viewData?: any;
   currentApplication: any;
   isEnabled: boolean;
 }
@@ -290,7 +291,7 @@ const CompactSequenceOverview = ({ steps }) => {
                 
                 {/* Enhanced loop visualization with nested steps */}
                 {isLoop && step.nestedSteps && step.nestedSteps.length > 0 && (
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-neutral-900 border border-blue-500/30 rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 min-w-48">
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-[#202020] border border-blue-500/30 rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 min-w-48">
                     <div className="text-xs font-medium text-blue-300 mb-2 flex items-center gap-1">
                       <RefreshCw className="w-3 h-3" />
                       Loop Steps ({step.nestedSteps.length})
@@ -329,16 +330,27 @@ const CompactSequenceOverview = ({ steps }) => {
   );
 };
 
+// Event handlers available in the builder
+const EVENT_HANDLERS = [
+  'onClick', 'onChange', 'onSubmit', 'onFocus', 'onBlur',
+  'onMouseEnter', 'onMouseLeave', 'onKeyDown', 'onKeyUp',
+  'onMouseMove', 'onDoubleClick', 'onInput', 'onLoad',
+  'onResize', 'onScroll', 'onTouchStart', 'onTouchEnd',
+  'onDrag', 'onDrop', 'onContextMenu', 'onAnimationStart',
+  'onAnimationEnd', 'onAnimationIteration', 'onPointerDown',
+  'onPointerUp', 'onPointerCancel'
+];
+
 // Extract comprehensive interaction information with workflows
 const extractInteractionInfo = (elements) => {
   const interactions = [];
-  
+
   const processElement = (element) => {
     // Skip virtual elements
     if (element.isVirtual) return;
-    
+
     const config = element.configuration || {};
-    
+
     // Check for event handlers and their associated workflows
     Object.keys(config).forEach(key => {
       if (key.toLowerCase().startsWith('on')) {
@@ -481,18 +493,22 @@ const CompactStats: React.FC<{ analysis: any, interactions: any[] }> = ({ analys
 
 const ViewAnatomyPanel: React.FC<ViewAnatomyPanelProps> = ({
   elements,
+  viewData,
   currentApplication,
   isEnabled
 }) => {
   const [showMore, setShowMore] = useState(false);
 
+  // Get elements from either prop
+  const sourceElements = elements || viewData?.layout || [];
+
   // Extensive debugging
   useEffect(() => {
-    
-    if (elements && elements.length > 0) {
-      
+
+    if (sourceElements && sourceElements.length > 0) {
+
       // Check all elements for overrides
-      elements.forEach((element, index) => {
+      sourceElements.forEach((element, index) => {
         if (element?.configuration?._overrides_) {
           element.configuration._overrides_.forEach((override, oIndex) => {
             if (override.plugins) {
@@ -501,10 +517,10 @@ const ViewAnatomyPanel: React.FC<ViewAnatomyPanelProps> = ({
         }
       });
     }
-  }, [elements, currentApplication, isEnabled]);
+  }, [sourceElements, currentApplication, isEnabled]);
 
   // Make sure we have valid elements data
-  const validElements = elements || [];
+  const validElements = sourceElements || [];
   
   // Debug: Force create some mock data to test the UI
   const mockElements = [
@@ -622,7 +638,7 @@ const ViewAnatomyPanel: React.FC<ViewAnatomyPanelProps> = ({
   // Force show for debugging
 
   return (
-    <div className="bg-gradient-to-r from-neutral-950 to-neutral-900 border-b border-neutral-700 p-2 mb-2">
+    <div className="bg-gradient-to-r from-[#141414] to-neutral-900 border-b border-neutral-700 p-2 mb-2">
       {/* Compact header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -647,6 +663,68 @@ const ViewAnatomyPanel: React.FC<ViewAnatomyPanelProps> = ({
       {/* Compact stats */}
       <CompactStats analysis={viewAnalysis} interactions={interactions} />
 
+      {/* Available Event Handlers & _overrides_ - when anatomy enabled */}
+      {isEnabled && (
+        <div className="mt-2 bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-lg p-2 border border-blue-700/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-semibold text-blue-300">Anatomy Mode: Element IntelliSense</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Event Handlers */}
+            <div className="bg-neutral-800/50 rounded p-2 border border-neutral-700">
+              <div className="flex items-center gap-1 mb-1">
+                <MousePointer className="w-3 h-3 text-green-400" />
+                <span className="font-medium text-neutral-200">Event Handlers</span>
+                <span className="text-neutral-500">({EVENT_HANDLERS.length})</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {EVENT_HANDLERS.slice(0, 6).map(handler => (
+                  <span key={handler} className="bg-green-900/30 text-green-300 px-1 py-0.5 rounded text-xs border border-green-700/30">
+                    {handler}
+                  </span>
+                ))}
+                <span className="text-neutral-500 px-1 py-0.5 text-xs">
+                  +{EVENT_HANDLERS.length - 6} more
+                </span>
+              </div>
+            </div>
+
+            {/* _overrides_ Object */}
+            <div className="bg-neutral-800/50 rounded p-2 border border-neutral-700">
+              <div className="flex items-center gap-1 mb-1">
+                <Code className="w-3 h-3 text-purple-400" />
+                <span className="font-medium text-neutral-200">_overrides_</span>
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1 text-purple-300">
+                  <span className="text-xs">• style</span>
+                  <span className="text-neutral-500 text-xs">- Override styles</span>
+                </div>
+                <div className="flex items-center gap-1 text-purple-300">
+                  <span className="text-xs">• className</span>
+                  <span className="text-neutral-500 text-xs">- CSS classes</span>
+                </div>
+                <div className="flex items-center gap-1 text-purple-300">
+                  <span className="text-xs">• props</span>
+                  <span className="text-neutral-500 text-xs">- Component props</span>
+                </div>
+                <div className="flex items-center gap-1 text-purple-300">
+                  <span className="text-xs">• visible</span>
+                  <span className="text-neutral-500 text-xs">- Visibility</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-2 flex items-center gap-1 text-xs text-blue-300/80">
+            <Info className="w-3 h-3" />
+            <span>These properties are available in code editors when working with elements</span>
+          </div>
+        </div>
+      )}
+
       {/* Sequence overview - always visible */}
       {sequenceSteps.length > 0 && (
         <div className="mt-2">
@@ -665,7 +743,7 @@ const ViewAnatomyPanel: React.FC<ViewAnatomyPanelProps> = ({
                 {sequenceSteps.map((step, index) => {
                   const Icon = step.icon;
                   return (
-                    <div key={step.id} className="bg-neutral-900 rounded-md p-2 border border-neutral-700">
+                    <div key={step.id} className="bg-[#202020] rounded-md p-2 border border-neutral-700">
                       <div className="flex items-start gap-2">
                         <div className={`w-4 h-4 rounded-full ${step.color} flex items-center justify-center text-white font-bold text-xs`}>
                           {step.id}
@@ -818,7 +896,7 @@ const ViewAnatomyPanel: React.FC<ViewAnatomyPanelProps> = ({
                   const workflowSteps = getDetailedWorkflowSteps(interaction.workflows, interaction.event);
                   
                   return (
-                    <div key={index} className="p-2 bg-neutral-900 rounded border border-neutral-700/50 hover:border-neutral-600 transition-colors">
+                    <div key={index} className="p-2 bg-[#202020] rounded border border-neutral-700/50 hover:border-neutral-600 transition-colors">
                       <div className="flex items-start gap-2">
                         <div className="flex-shrink-0 mt-0.5">
                           <Icon className="w-3 h-3 text-green-400" />

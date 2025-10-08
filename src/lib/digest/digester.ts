@@ -55,9 +55,15 @@ class MessageLogger {
     this.messages = [];
     this.maxMessages = 1000; // Prevent memory leaks
     this.subscribers = new Set();
+    this.isPaused = false;
+    this.isRecording = true;
   }
 
   log(level, message, context = {}) {
+    if (!this.isRecording || this.isPaused) {
+      return;
+    }
+
     const logEntry = {
       id: this.generateId(),
       timestamp: new Date().toISOString(),
@@ -202,6 +208,36 @@ class MessageLogger {
     };
   }
 
+  // Recording controls
+  pause() {
+    this.isPaused = true;
+    this.notifySubscribers({ type: 'paused' });
+  }
+
+  resume() {
+    this.isPaused = false;
+    this.notifySubscribers({ type: 'resumed' });
+  }
+
+  startRecording() {
+    this.isRecording = true;
+    this.isPaused = false;
+    this.notifySubscribers({ type: 'recording_started' });
+  }
+
+  stopRecording() {
+    this.isRecording = false;
+    this.notifySubscribers({ type: 'recording_stopped' });
+  }
+
+  getStatus() {
+    return {
+      isRecording: this.isRecording,
+      isPaused: this.isPaused,
+      messageCount: this.messages.length
+    };
+  }
+
   // Private methods
   generateId() {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -270,6 +306,184 @@ class MessageLogger {
 }
 
 const messageLogger = new MessageLogger();
+
+class NetworkLogger {
+  constructor() {
+    this.requests = [];
+    this.maxRequests = 500; // Prevent memory leaks
+    this.subscribers = new Set();
+    this.isPaused = false;
+    this.isRecording = true;
+  }
+
+  logRequest(requestData) {
+    if (!this.isRecording || this.isPaused) {
+      return null;
+    }
+
+    const logEntry = {
+      id: this.generateId(),
+      timestamp: new Date().toISOString(),
+      type: 'request',
+      method: requestData.method || 'GET',
+      url: requestData.url,
+      headers: requestData.headers || {},
+      body: requestData.body,
+      startTime: Date.now(),
+      status: 'pending',
+      duration: null,
+      response: null,
+      error: null
+    };
+
+    this.requests.push(logEntry);
+
+    // Maintain max requests limit
+    if (this.requests.length > this.maxRequests) {
+      this.requests = this.requests.slice(-this.maxRequests);
+    }
+
+    // Notify subscribers
+    this.notifySubscribers(logEntry);
+
+    return logEntry.id;
+  }
+
+  logResponse(requestId, responseData) {
+    const request = this.requests.find(req => req.id === requestId);
+    if (request) {
+      request.status = responseData.status || 'completed';
+      request.duration = Date.now() - request.startTime;
+      request.response = {
+        status: responseData.status,
+        statusText: responseData.statusText,
+        headers: responseData.headers || {},
+        data: responseData.data,
+        size: JSON.stringify(responseData.data || '').length
+      };
+      request.type = 'completed';
+
+      // Notify subscribers of update
+      this.notifySubscribers(request);
+    }
+  }
+
+  logError(requestId, error) {
+    const request = this.requests.find(req => req.id === requestId);
+    if (request) {
+      request.status = 'error';
+      request.duration = Date.now() - request.startTime;
+      request.error = {
+        message: error.message || 'Network request failed',
+        code: error.code,
+        stack: error.stack
+      };
+      request.type = 'error';
+
+      // Notify subscribers of update
+      this.notifySubscribers(request);
+    }
+  }
+
+  getRequests(filters = {}) {
+    let filtered = this.requests;
+
+    if (filters.method) {
+      filtered = filtered.filter(req => req.method.toLowerCase() === filters.method.toLowerCase());
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter(req => req.status === filters.status);
+    }
+
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      filtered = filtered.filter(req => 
+        req.url.toLowerCase().includes(search) ||
+        req.method.toLowerCase().includes(search)
+      );
+    }
+
+    if (filters.since) {
+      const since = new Date(filters.since);
+      filtered = filtered.filter(req => new Date(req.timestamp) >= since);
+    }
+
+    // Sort by timestamp descending (latest first)
+    filtered = filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    if (filters.limit) {
+      filtered = filtered.slice(0, filters.limit);
+    }
+
+    return filtered;
+  }
+
+  subscribe(callback) {
+    this.subscribers.add(callback);
+    return () => this.subscribers.delete(callback);
+  }
+
+  clear() {
+    this.requests = [];
+    this.notifySubscribers({ type: 'cleared' });
+  }
+
+  export() {
+    return {
+      requests: this.requests,
+      timestamp: new Date().toISOString(),
+      count: this.requests.length,
+    };
+  }
+
+  // Recording controls
+  pause() {
+    this.isPaused = true;
+    this.notifySubscribers({ type: 'paused' });
+  }
+
+  resume() {
+    this.isPaused = false;
+    this.notifySubscribers({ type: 'resumed' });
+  }
+
+  startRecording() {
+    this.isRecording = true;
+    this.isPaused = false;
+    this.notifySubscribers({ type: 'recording_started' });
+  }
+
+  stopRecording() {
+    this.isRecording = false;
+    this.notifySubscribers({ type: 'recording_stopped' });
+  }
+
+  getStatus() {
+    return {
+      isRecording: this.isRecording,
+      isPaused: this.isPaused,
+      requestCount: this.requests.length
+    };
+  }
+
+  // Private methods
+  generateId() {
+    return `net-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  notifySubscribers(logEntry) {
+    this.subscribers.forEach((callback) => {
+      try {
+        callback(logEntry);
+      } catch (error) {
+        // Silent fail to prevent breaking the logger
+      }
+    });
+  }
+}
+
+const networkLogger = new NetworkLogger();
 
 class StateManager {
   constructor() {
@@ -409,13 +623,18 @@ export const clearAllCaches = () => {
   messageLogger.batchedLogs = [];
 };
 
-export { messageLogger };
+export { messageLogger, networkLogger };
 export const logMessage = (level, message, context) => messageLogger.log(level, message, context);
 export const logInfo = (message, context) => messageLogger.info(message, context);
 export const logWarn = (message, context) => messageLogger.warn(message, context);
 export const logError = (message, context) => messageLogger.error(message, context);
 export const logDebug = (message, context) => messageLogger.debug(message, context);
 export const logSuccess = (message, context) => messageLogger.success(message, context);
+
+// Network logging functions
+export const logNetworkRequest = (requestData) => networkLogger.logRequest(requestData);
+export const logNetworkResponse = (requestId, responseData) => networkLogger.logResponse(requestId, responseData);
+export const logNetworkError = (requestId, error) => networkLogger.logError(requestId, error);
 
 export const processHit = async (
   process,
@@ -532,7 +751,7 @@ export const executeProcess = async (
     );
 
     // Tail call optimization for recursion
-    return await executeProcess(
+    const result = await executeProcess(
       index + 1,
       operations,
       applicationId,
@@ -546,12 +765,17 @@ export const executeProcess = async (
       editMode,
       config
     );
-    message.info(`Process executed successfully at step ${index}`);
+    
+    // Log success after recursive call completes
+    messageLogger.info(`Process executed successfully at step ${index}`);
+    return result;
   } catch (error) {
     messageLogger.error(`Process execution failed at step ${index}`, {
       index,
       operation: item?.type,
       operationId: item?.id,
+      compId,
+      pageId,
       error: error.message,
     });
     throw error;
@@ -580,21 +804,72 @@ export const processController = async (
   const pluginKey = generatePluginKey(plugins);
   const controllerKey = `${pluginKey}`;
 
-  // Optimized circular replacer
+  // Enhanced circular replacer with depth limiting and error handling
   const getCircularReplacer = () => {
     const seen = new WeakSet();
+    const depthMap = new WeakMap();
+    const MAX_DEPTH = 10;
+    
     return (key, value) => {
-      if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
-          return '[Circular Reference]';
-        }
-        seen.add(value);
+      // Handle null/undefined early
+      if (value === null || value === undefined) {
+        return value;
       }
+      
+      // Handle primitives
+      if (typeof value !== 'object') {
+        return value;
+      }
+      
+      // Check for circular references
+      if (seen.has(value)) {
+        return '[Circular Reference]';
+      }
+      
+      // Check depth to prevent infinite recursion
+      const currentDepth = depthMap.get(value) || 0;
+      if (currentDepth > MAX_DEPTH) {
+        return '[Max Depth Exceeded]';
+      }
+      
+      // Handle special objects that might cause issues
+      if (value instanceof Error) {
+        return {
+          name: value.name,
+          message: value.message,
+          stack: value.stack
+        };
+      }
+      
+      if (value instanceof Event || value instanceof Node) {
+        return '[DOM Object]';
+      }
+      
+      if (typeof value === 'function') {
+        return '[Function]';
+      }
+      
+      // Add to seen set and track depth
+      seen.add(value);
+      depthMap.set(value, currentDepth + 1);
+      
       return value;
     };
   };
 
-  const stringified = JSON.stringify(event, getCircularReplacer());
+  let stringified;
+  try {
+    stringified = JSON.stringify(event, getCircularReplacer());
+  } catch (error) {
+    console.error('Failed to stringify event object:', error);
+    // Fallback to a safe minimal representation
+    stringified = JSON.stringify({
+      type: event?.type || 'unknown',
+      timestamp: Date.now(),
+      error: 'Serialization failed',
+      originalError: error.message
+    });
+  }
   tempStore.storeEvent(controllerKey, stringified);
 
   try {
@@ -630,6 +905,8 @@ export const processController = async (
   } catch (error) {
     messageLogger.error('Process controller error', {
       controllerKey,
+      compId,
+      pageId,
       error: error.message,
     });
 

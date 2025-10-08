@@ -481,23 +481,99 @@ function secureInterpolate(template, sources) {
     return Boolean(value);
   }
 
+  // Helper function to safely evaluate JavaScript expressions
+  function evaluateJavaScriptExpression(expression, context = predefinedSources) {
+    try {
+      console.log('[evaluateJavaScriptExpression] Original expression:', expression);
+      console.log('[evaluateJavaScriptExpression] Context state:', context.state);
+      
+      // Replace template variables in the expression first
+      let processedExpr = expression;
+      
+      // Replace state references with actual values
+      processedExpr = processedExpr.replace(/\b(state|self|event|window|localStore|controller)\.[\w.]+/g, (match) => {
+        const value = getValue(match, context);
+        console.log('[evaluateJavaScriptExpression] Replacing', match, 'with', value);
+        if (value === undefined || value === null) {
+          return 'null';
+        }
+        if (typeof value === 'string') {
+          return `"${value.replace(/"/g, '\\"')}"`;
+        }
+        return JSON.stringify(value);
+      });
+
+      console.log('[evaluateJavaScriptExpression] Processed expression:', processedExpr);
+
+      // Create a safe evaluation context
+      const safeContext = {
+        Date: Date,
+        Math: Math,
+        String: String,
+        Number: Number,
+        Array: Array,
+        Object: Object,
+        JSON: JSON,
+        parseInt: parseInt,
+        parseFloat: parseFloat,
+        isNaN: isNaN,
+        isFinite: isFinite,
+        ...context
+      };
+
+      // Use Function constructor for safer evaluation than eval
+      const func = new Function(...Object.keys(safeContext), `"use strict"; return (${processedExpr});`);
+      const result = func(...Object.values(safeContext));
+      console.log('[evaluateJavaScriptExpression] Result:', result);
+      return result;
+    } catch (error) {
+      console.warn('Failed to evaluate JavaScript expression:', expression, error);
+      return expression; // Return original expression if evaluation fails
+    }
+  }
+
   function parseTernary(expression, context = predefinedSources) {
+    console.log('[parseTernary] Parsing expression:', expression);
+    
     // Enhanced ternary parsing to handle nested objects and complex conditions
     const ternaryMatch = expression.match(/^(.+?)\s*\?\s*(.+?)\s*:\s*(.+)$/);
 
     if (!ternaryMatch) {
+      console.log('[parseTernary] No ternary match found');
       return null;
     }
 
     const [, condition, trueValue, falseValue] = ternaryMatch;
+    console.log('[parseTernary] Condition:', condition, 'True:', trueValue, 'False:', falseValue);
 
     try {
       const conditionResult = evaluateLogical(condition.trim(), context);
+      console.log('[parseTernary] Condition result:', conditionResult);
       const selectedValue = conditionResult ? trueValue.trim() : falseValue.trim();
+      console.log('[parseTernary] Selected value:', selectedValue);
 
-      // Parse the selected value
-      return parseLiteral(selectedValue) || selectedValue;
+      // First try to parse as a literal
+      const literalResult = parseLiteral(selectedValue);
+      if (literalResult !== undefined) {
+        console.log('[parseTernary] Literal result:', literalResult);
+        return literalResult;
+      }
+
+      // If not a literal, try to evaluate as a JavaScript expression
+      const evaluatedResult = evaluateJavaScriptExpression(selectedValue, context);
+      console.log('[parseTernary] Evaluated result:', evaluatedResult);
+      
+      // If evaluation returned the original expression, it means it failed
+      if (evaluatedResult === selectedValue) {
+        // Try to get it as a simple property reference
+        const propertyResult = getValue(selectedValue, context) || selectedValue;
+        console.log('[parseTernary] Property result:', propertyResult);
+        return propertyResult;
+      }
+      
+      return evaluatedResult;
     } catch (error) {
+      console.log('[parseTernary] Error:', error);
       return '';
     }
   }

@@ -1074,7 +1074,7 @@ export function createBaseProps(
         ? 'cursor-path'
         : builderCursorMode === 'comment'
         ? '!cursor-comment !pointer-events-none'
-        : builderCursorMode === 'xray'
+        : builderCursorMode === 'voetsek'
         ? '!cursor-xray'
         : editMode && !isDrawingPathActive && builderCursorMode === 'default'
         ? `${!isLayout && 'cube'} active:cursor-grabbing`

@@ -4,7 +4,7 @@ import { initJsonDebugStyles, logJsonDebug } from './debug';
 import axios from 'axios';
 import _ from 'lodash';
 import { message } from 'antd';
-import { messageLogger} from '../digester';
+import { messageLogger, networkLogger } from '../digester';
 import { createEventHandler } from '../../utils';
 import dayjs from 'dayjs';
 import { nanoid } from 'nanoid';
@@ -7225,9 +7225,34 @@ return '';  // Return value will be stored in state if storeResult is true`,
       process: async (process, globalObj, globalErrors, event, currentLog, appId, navigate, paramState, sessionKey) => {
                   try {
               const renderElementUtil= process?.renderElementUtil ;   
+            
+            // Enhanced logging at start
+            console.log('🚀 ExecuteCode Step Starting:', {
+              stepName: process.name,
+              codeLength: process.code?.length || 0,
+              hasCode: !!process.code,
+              timestamp: new Date().toISOString()
+            });
+            messageLogger.info(`Starting executeCode step: ${process.name}`, {
+              codeLength: process.code?.length || 0,
+              hasTimeout: !!process.timeout,
+              hasMemoryLimit: !!process.memoryLimit
+            });
+
             // Input validation
             if (!process.code || typeof process.code !== 'string') {
-              throw new Error('Invalid code input');
+              const validationError = new Error('Invalid code input');
+              console.error('❌ ExecuteCode Validation Failed:', {
+                stepName: process.name,
+                error: validationError.message,
+                codeType: typeof process.code,
+                hasCode: !!process.code
+              });
+              messageLogger.error(`ExecuteCode validation failed: ${process.name}`, {
+                error: validationError.message,
+                codeType: typeof process.code
+              });
+              throw validationError;
             }
 
             // Add timeout wrapper
@@ -7248,25 +7273,84 @@ return '';  // Return value will be stored in state if storeResult is true`,
               
               return new Promise((resolve, reject) => {
                 const timeoutId = setTimeout(() => {
-                  reject(new Error('Execution timeout exceeded (5000ms)'));
+                  const timeoutError = new Error('Execution timeout exceeded (5000ms)');
+                  console.error('🚨 Code Execution Timeout:', {
+                    error: timeoutError.message,
+                    code: code.substring(0, 200) + '...',
+                    timeout: '5000ms',
+                    timestamp: new Date().toISOString()
+                  });
+                  messageLogger.error('Code execution timeout', {
+                    error: timeoutError.message,
+                    timeout: '5000ms',
+                    codePreview: code.substring(0, 200) + '...'
+                  });
+                  reject(timeoutError);
                 }, 5000);
 
                 try {
+                  console.log('🔄 Starting code execution:', {
+                    codeLength: code.length,
+                    contextKeys: contextKeys,
+                    timestamp: new Date().toISOString()
+                  });
+                  messageLogger.info('Starting code execution', {
+                    codeLength: code.length,
+                    contextKeys: contextKeys.length
+                  });
+
                   // Create function with context parameters
                   const fn = new Function(...contextKeys, code);
+                  
                   // Execute with context values
                   Promise.resolve(fn.apply(null, contextValues))
                     .then(result => {
                       clearTimeout(timeoutId);
+                      console.log('✅ Code execution completed successfully:', {
+                        result: result,
+                        timestamp: new Date().toISOString()
+                      });
+                      messageLogger.success('Code execution completed successfully', {
+                        resultType: typeof result,
+                        hasResult: result !== undefined
+                      });
                       resolve(result);
                     })
                     .catch(error => {
                       clearTimeout(timeoutId);
-                      reject(new Error(`Code execution failed: ${error.message}`));
+                      const executionError = new Error(`Code execution failed: ${error.message}`);
+                      console.error('❌ Code execution error (Promise catch):', {
+                        error: error.message,
+                        stack: error.stack,
+                        code: code,
+                        timestamp: new Date().toISOString(),
+                        errorType: error.name || 'Unknown'
+                      });
+                      messageLogger.error('Code execution failed in promise', {
+                        error: error.message,
+                        stack: error.stack,
+                        errorType: error.name || 'Unknown',
+                        codePreview: code.substring(0, 200) + '...'
+                      });
+                      reject(executionError);
                     });
                 } catch (error) {
                   clearTimeout(timeoutId);
-                  reject(new Error(`Code execution failed: ${error.message}`));
+                  const syncError = new Error(`Code execution failed: ${error.message}`);
+                  console.error('❌ Code execution error (Sync catch):', {
+                    error: error.message,
+                    stack: error.stack,
+                    code: code,
+                    timestamp: new Date().toISOString(),
+                    errorType: error.name || 'Unknown'
+                  });
+                  messageLogger.error('Code execution failed synchronously', {
+                    error: error.message,
+                    stack: error.stack,
+                    errorType: error.name || 'Unknown',
+                    codePreview: code.substring(0, 200) + '...'
+                  });
+                  reject(syncError);
                 }
               });
             };
@@ -7274,7 +7358,128 @@ return '';  // Return value will be stored in state if storeResult is true`,
                                   // Create restricted execution context
             const restrictedContext = {
               // Core libraries and utilities
-              _: _,  // Full Lodash
+              _: _,
+              
+              // Hijacked console for logging to messageLogger
+              console: {
+                log: (...args) => {
+                  const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                  ).join(' ');
+                  messageLogger.info(`Console: ${message}`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console',
+                    originalArgs: args
+                  });
+                  // Also log to real console for development
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.log(`[${process.name}]`, ...args);
+                  }
+                },
+                error: (...args) => {
+                  const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                  ).join(' ');
+                  messageLogger.error(`Console Error: ${message}`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console',
+                    originalArgs: args
+                  });
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.error(`[${process.name}]`, ...args);
+                  }
+                },
+                warn: (...args) => {
+                  const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                  ).join(' ');
+                  messageLogger.warn(`Console Warning: ${message}`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console',
+                    originalArgs: args
+                  });
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.warn(`[${process.name}]`, ...args);
+                  }
+                },
+                info: (...args) => {
+                  const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                  ).join(' ');
+                  messageLogger.info(`Console Info: ${message}`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console',
+                    originalArgs: args
+                  });
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.info(`[${process.name}]`, ...args);
+                  }
+                },
+                debug: (...args) => {
+                  const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                  ).join(' ');
+                  messageLogger.debug(`Console Debug: ${message}`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console',
+                    originalArgs: args
+                  });
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.debug(`[${process.name}]`, ...args);
+                  }
+                },
+                table: (...args) => {
+                  const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                  ).join(' ');
+                  messageLogger.info(`Console Table: ${message}`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console',
+                    originalArgs: args
+                  });
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.table(...args);
+                  }
+                },
+                group: (...args) => {
+                  const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                  ).join(' ');
+                  messageLogger.info(`Console Group: ${message}`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console',
+                    originalArgs: args
+                  });
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.group(...args);
+                  }
+                },
+                groupEnd: () => {
+                  messageLogger.info(`Console Group End`, {
+                    stepName: process.name,
+                    compId: process.compId,
+                    pageId: process.pageId,
+                    source: 'user_console'
+                  });
+                  if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+                    window.console.groupEnd();
+                  }
+                }
+              },  // Full Lodash
               R: R,  // Ramda
               axios: axios,  // Full Axios
               dayjs: dayjs,  // Full Day.js
@@ -7303,7 +7508,7 @@ return '';  // Return value will be stored in state if storeResult is true`,
             Promise: Promise,
             Set: Set,
             Map: Map,
-
+self:process?.store?.getState()?.appState[process?.compId],
             // Browser APIs and Utilities
             setTimeout,
             setInterval,
@@ -7609,41 +7814,98 @@ return '';  // Return value will be stored in state if storeResult is true`,
                 return deletedElements;
               },
 
-              // Hide element (set display: none or visibility: hidden)
+              // Hide element using classNames with hidden class
               hide: (elementId, viewId, method = 'display') => {
                 const element = restrictedContext.elements.get(elementId, viewId);
                 if (!element) throw new Error('Element not found');
 
-                const styleUpdate = method === 'display' 
-                  ? { display: 'none' }
-                  : { visibility: 'hidden' };
+                console.log(`🙈 Hide called for element ${elementId}:`, {
+                  element: element,
+                  currentClassNames: element.configuration?.classNames,
+                  viewId: viewId
+                });
 
-                return restrictedContext.elements.updateStyle(elementId, styleUpdate, viewId);
+                // Use state.set to add 'hidden' class
+                const result = restrictedContext.state.set(`${elementId}.classNames`, "hidden", {
+                  operation: "concat",
+                  config: {
+                    separator: " "
+                  },
+                  elementContext: {
+                    elementId: elementId,
+                    elementConfiguration: element.configuration,
+                    completeElement: element
+                  }
+                });
+
+                console.log(`✅ Hide completed for element ${elementId}, result:`, result);
+                return result;
               },
 
-              // Show element
+              // Show element by removing hidden class
               show: (elementId, viewId, displayValue = 'block') => {
                 const element = restrictedContext.elements.get(elementId, viewId);
                 if (!element) throw new Error('Element not found');
 
-                return restrictedContext.elements.updateStyle(elementId, { 
-                  display: displayValue, 
-                  visibility: 'visible' 
-                }, viewId);
+                console.log(`🔍 Show called for element ${elementId}:`, {
+                  element: element,
+                  currentClassNames: element.configuration?.classNames,
+                  viewId: viewId
+                });
+
+                // Get current classNames and remove 'hidden' class manually
+                const currentClassNames = element.configuration?.classNames || '';
+                const classArray = currentClassNames.split(' ').map(c => c.trim()).filter(Boolean);
+                const newClasses = classArray.filter(c => c !== 'hidden').join(' ');
+
+                console.log(`🔄 Processing classNames: "${currentClassNames}" -> "${newClasses}"`);
+
+                // Use state.set to update classNames directly
+                const result = restrictedContext.state.set(`${elementId}.classNames`, newClasses, {
+                  operation: "set",
+                  elementContext: {
+                    elementId: elementId,
+                    elementConfiguration: element.configuration,
+                    completeElement: element
+                  }
+                });
+
+                console.log(`✅ Show completed for element ${elementId}, result:`, result);
+                return result;
               },
 
               // Update element configuration
               updateConfig: (elementId, config, viewId) => {
                 const targetViewId = viewId || process?.pageId;
                 
-                process?.store?.dispatch({
-                  type: 'app/updateElementConfiguration',
-                  payload: {
-                    viewId: targetViewId,
-                    elementId: elementId,
-                    configuration: config
-                  }
-                });
+                // Check if config contains style-related properties
+                const { classNames, cssVariables, style, ...otherConfig } = config;
+                
+                // If there are style-related properties, use updateElementStyle
+                if (classNames !== undefined || cssVariables !== undefined || style !== undefined) {
+                  process?.store?.dispatch({
+                    type: 'app/updateElementStyle',
+                    payload: {
+                      viewId: targetViewId,
+                      elementId: elementId,
+                      classNames,
+                      cssVariables,
+                      style
+                    }
+                  });
+                }
+                
+                // If there are other configuration properties, use updateElementConfiguration
+                if (Object.keys(otherConfig).length > 0) {
+                  process?.store?.dispatch({
+                    type: 'app/updateElementConfiguration',
+                    payload: {
+                      viewId: targetViewId,
+                      elementId: elementId,
+                      configuration: otherConfig
+                    }
+                  });
+                }
 
                 return restrictedContext.elements.get(elementId, targetViewId);
               },
@@ -7788,7 +8050,13 @@ return '';  // Return value will be stored in state if storeResult is true`,
                 if (!process?.store?.dispatch || !process?.setAppStatePartial) {
                   throw new Error('State management not available');
                 }
-
+console.log({
+                    key: key,
+                    payload: value,
+                    operationType: options.operation || 'set',
+                    operationConfig: options.config || {},
+                    elementContext: options.elementContext
+                  })
                 process.store.dispatch(
                   process.setAppStatePartial({
                     key: key,
@@ -7867,6 +8135,397 @@ return '';  // Return value will be stored in state if storeResult is true`,
                   restrictedContext.state.delete(key);
                 });
                 return true;
+              }
+            },
+
+            // ELEMENT STATE MANAGEMENT UTILITIES
+            // Provides easy-to-use functions for managing element state, styling, and configuration
+            // Works with both regular elements and virtual elements
+            // Usage examples:
+            //   element.setState({ loading: true })
+            //   element.setStyling({ backgroundColor: 'red' })
+            //   element.addClass('active')
+            //   element.setVisible(false)
+            element: {
+              // Set current element's state
+              setState: (value, options = {}) => {
+                const elementId = process?.compId || process?.currentElementId;
+                if (!elementId) {
+                  throw new Error('No current element ID available');
+                }
+                
+                return restrictedContext.state.set(elementId, value, {
+                  operation: options.operation || 'merge',
+                  config: { mergeStrategy: options.mergeStrategy || 'shallow' },
+                  elementContext: {
+                    elementId,
+                    elementConfiguration: process?.currentItemConfiguration,
+                    allElements: process?.allElements,
+                    viewId: process?.tab || process?.pageId,
+                    pageId: process?.tab || process?.pageId,
+                    compId: elementId,
+                    completeElement: process?.currentItem
+                  }
+                });
+              },
+
+              // Get current element's state
+              getState: (key, defaultValue) => {
+                const elementId = process?.compId || process?.currentElementId;
+                if (!elementId) return defaultValue;
+                
+                const fullKey = key ? `${elementId}.${key}` : elementId;
+                return restrictedContext.state.get(fullKey, defaultValue);
+              },
+
+              // Set current element's styling
+              setStyling: (styles, options = {}) => {
+                const elementId = process?.compId || process?.currentElementId;
+                if (!elementId) {
+                  throw new Error('No current element ID available');
+                }
+
+                const stylingKey = `${elementId}.styling`;
+                return restrictedContext.state.set(stylingKey, styles, {
+                  operation: options.operation || 'merge',
+                  config: { mergeStrategy: options.mergeStrategy || 'shallow' },
+                  elementContext: {
+                    elementId,
+                    elementConfiguration: process?.currentItemConfiguration,
+                    allElements: process?.allElements,
+                    viewId: process?.tab || process?.pageId,
+                    pageId: process?.tab || process?.pageId,
+                    compId: elementId
+                  }
+                });
+              },
+
+              // Get current element's styling
+              getStyling: (key, defaultValue) => {
+                const elementId = process?.compId || process?.currentElementId;
+                if (!elementId) return defaultValue;
+                
+                const fullKey = key ? `${elementId}.styling.${key}` : `${elementId}.styling`;
+                return restrictedContext.state.get(fullKey, defaultValue);
+              },
+
+              // Set current element's configuration
+              setConfig: (config, options = {}) => {
+                const elementId = process?.compId || process?.currentElementId;
+                if (!elementId) {
+                  throw new Error('No current element ID available');
+                }
+
+                const configKey = `${elementId}.config`;
+                return restrictedContext.state.set(configKey, config, {
+                  operation: options.operation || 'merge',
+                  config: { mergeStrategy: options.mergeStrategy || 'shallow' },
+                  elementContext: {
+                    elementId,
+                    elementConfiguration: process?.currentItemConfiguration,
+                    allElements: process?.allElements,
+                    viewId: process?.tab || process?.pageId,
+                    pageId: process?.tab || process?.pageId,
+                    compId: elementId
+                  }
+                });
+              },
+
+              // Get current element's configuration
+              getConfig: (key, defaultValue) => {
+                const elementId = process?.compId || process?.currentElementId;
+                if (!elementId) return defaultValue;
+                
+                const fullKey = key ? `${elementId}.config.${key}` : `${elementId}.config`;
+                return restrictedContext.state.get(fullKey, defaultValue);
+              },
+
+              // Set element visibility
+              setVisible: (visible = true) => {
+                return restrictedContext.element.setStyling({
+                  display: visible ? '' : 'none',
+                  visibility: visible ? 'visible' : 'hidden'
+                });
+              },
+
+              // Toggle element visibility
+              toggleVisible: () => {
+                const currentDisplay = restrictedContext.element.getStyling('display');
+                const isVisible = currentDisplay !== 'none';
+                return restrictedContext.element.setVisible(!isVisible);
+              },
+
+              // Set element classes
+              setClasses: (classes, options = {}) => {
+                const elementId = process?.compId || process?.currentElementId;
+                console.log(`🎨 [setClasses] Element ID:`, elementId);
+                console.log(`🎨 [setClasses] Setting classes:`, classes);
+                console.log(`🎨 [setClasses] Options:`, options);
+                
+                if (!elementId) {
+                  console.error(`🎨 [setClasses] No element ID available`);
+                  throw new Error('No current element ID available');
+                }
+
+                const classKey = `${elementId}.classNames`;
+                const operation = options.append ? 'stringAppend' : 
+                                options.prepend ? 'stringPrepend' : 'set';
+                
+                console.log(`🎨 [setClasses] Class key:`, classKey);
+                console.log(`🎨 [setClasses] Operation:`, operation);
+                
+                const result = restrictedContext.state.set(classKey, classes, {
+                  operation,
+                  config: { separator: ' ' },
+                  elementContext: {
+                    elementId,
+                    elementConfiguration: process?.currentItemConfiguration,
+                    allElements: process?.allElements,
+                    viewId: process?.tab || process?.pageId,
+                    pageId: process?.tab || process?.pageId,
+                    compId: elementId
+                  }
+                });
+                
+                console.log(`🎨 [setClasses] State.set result:`, result);
+                return result;
+              },
+
+              // Get element classes
+              getClasses: () => {
+                const elementId = process?.compId || process?.currentElementId;
+                console.log(`📋 [getClasses] Element ID:`, elementId);
+                if (!elementId) {
+                  console.log(`📋 [getClasses] No element ID, returning empty string`);
+                  return '';
+                }
+
+                // First check state (using classNames - plural!)
+                let classes = restrictedContext.state.get(`${elementId}.classNames`, '');
+                console.log(`📋 [getClasses] Classes from state (classNames):`, classes);
+
+                // If no classes in state, get from the actual element configuration
+                if (!classes) {
+                  // Get the actual element being edited
+                  const currentElement = process?.currentItemConfiguration ||
+                                       process?.allElements?.find(el => el.i === elementId);
+
+                  // PRIORITY ORDER: configuration.classNames → classNames → style.className → configuration.className → className
+                  classes = currentElement?.configuration?.classNames ||
+                           currentElement?.classNames ||
+                           currentElement?.style?.className ||
+                           currentElement?.configuration?.className ||
+                           currentElement?.className ||
+                           '';
+
+                  console.log(`📋 [getClasses] Classes from element configuration:`, classes);
+                }
+
+                console.log(`📋 [getClasses] Final retrieved classes:`, classes);
+                return classes;
+              },
+
+              // Add class to element
+              addClass: (className) => {
+                const currentClasses = restrictedContext.element.getClasses();
+                console.log(`➕ [addClass] Current classes:`, currentClasses);
+                console.log(`➕ [addClass] Adding class:`, className);
+                
+                const classArray = currentClasses.split(' ').filter(Boolean);
+                console.log(`➕ [addClass] Current class array:`, classArray);
+                
+                if (!classArray.includes(className)) {
+                  classArray.push(className);
+                  console.log(`➕ [addClass] New class array:`, classArray);
+                  const result = restrictedContext.element.setClasses(classArray.join(' '));
+                  console.log(`➕ [addClass] Set classes result:`, result);
+                  return result;
+                }
+                console.log(`➕ [addClass] Class already exists, skipping`);
+                return true;
+              },
+
+              // Remove class from element
+              removeClass: (className) => {
+                const currentClasses = restrictedContext.element.getClasses();
+                console.log(`🗑️ [removeClass] Current classes:`, currentClasses);
+                console.log(`🗑️ [removeClass] Removing class:`, className);
+                
+                const classArray = currentClasses.split(' ').filter(Boolean);
+                const filteredClasses = classArray.filter(cls => cls !== className);
+                console.log(`🗑️ [removeClass] Filtered classes:`, filteredClasses);
+                
+                const result = restrictedContext.element.setClasses(filteredClasses.join(' '));
+                console.log(`🗑️ [removeClass] Result:`, result);
+                return result;
+              },
+
+              // Toggle class on element
+              toggleClass: (className) => {
+                const currentClasses = restrictedContext.element.getClasses();
+                console.log(`🔄 [toggleClass] Current classes:`, currentClasses);
+                console.log(`🔄 [toggleClass] Toggling class:`, className);
+                
+                const classArray = currentClasses.split(' ').filter(Boolean);
+                console.log(`🔄 [toggleClass] Current class array:`, classArray);
+                
+                if (classArray.includes(className)) {
+                  console.log(`🔄 [toggleClass] Class exists, removing it`);
+                  return restrictedContext.element.removeClass(className);
+                } else {
+                  console.log(`🔄 [toggleClass] Class doesn't exist, adding it`);
+                  return restrictedContext.element.addClass(className);
+                }
+              },
+
+              // Get current element ID
+              getId: () => {
+                return process?.compId || process?.currentElementId;
+              },
+
+              // Check if current element is virtual
+              isVirtual: () => {
+                const elementId = restrictedContext.element.getId();
+                if (!elementId) return false;
+                
+                const elementState = restrictedContext.state.get(elementId);
+                return elementState?.__isVirtualElement === true;
+              },
+
+              // Get virtual element metadata
+              getVirtualMeta: () => {
+                const elementId = restrictedContext.element.getId();
+                if (!elementId) return null;
+                
+                const elementState = restrictedContext.state.get(elementId);
+                if (!elementState?.__isVirtualElement) return null;
+                
+                return {
+                  dynamicIndex: elementState.__dynamicIndex,
+                  dynamicDataKey: elementState.__dynamicDataKey,
+                  lastUpdated: elementState.__lastUpdated
+                };
+              },
+
+              // Update virtual element data
+              updateVirtualData: (newData) => {
+                const elementId = restrictedContext.element.getId();
+                if (!elementId) {
+                  throw new Error('No current element ID available');
+                }
+                
+                const currentState = restrictedContext.state.get(elementId);
+                if (!currentState?.__isVirtualElement) {
+                  throw new Error('Current element is not a virtual element');
+                }
+                
+                const updatedData = {
+                  ...newData,
+                  __dynamicIndex: currentState.__dynamicIndex,
+                  __dynamicDataKey: currentState.__dynamicDataKey,
+                  __isVirtualElement: true,
+                  __lastUpdated: Date.now()
+                };
+                
+                return restrictedContext.state.set(elementId, updatedData);
+              },
+
+              // Clear current element's state
+              clearState: () => {
+                const elementId = process?.compId || process?.currentElementId;
+                if (!elementId) return true;
+                
+                return restrictedContext.state.delete(elementId);
+              }
+            },
+
+            // VIRTUAL ELEMENT UTILITIES
+            // Specialized functions for managing virtual elements and their dynamic data
+            // Usage examples:
+            //   virtual.create('virtual-1', { name: 'John' }, { dynamicIndex: 0, dynamicDataKey: '{{state.users}}' })
+            //   virtual.updateByDataSource('{{state.todos}}', newTodosArray)
+            //   virtual.cleanup(validElementIds)
+            virtual: {
+              // Create virtual element state
+              create: (elementId, data, virtualMeta = {}) => {
+                const virtualData = {
+                  ...data,
+                  __isVirtualElement: true,
+                  __dynamicIndex: virtualMeta.dynamicIndex,
+                  __dynamicDataKey: virtualMeta.dynamicDataKey,
+                  __lastUpdated: Date.now()
+                };
+                
+                return restrictedContext.state.set(elementId, virtualData, {
+                  elementContext: {
+                    elementId,
+                    viewId: process?.tab || process?.pageId,
+                    pageId: process?.tab || process?.pageId,
+                    compId: elementId
+                  }
+                });
+              },
+
+              // Update all virtual elements with same data source
+              updateByDataSource: (dynamicDataKey, newDataArray) => {
+                const allState = restrictedContext.state.getAll();
+                const updates = [];
+                
+                Object.entries(allState).forEach(([key, value]) => {
+                  if (value?.__isVirtualElement && value?.__dynamicDataKey === dynamicDataKey) {
+                    const index = value.__dynamicIndex;
+                    if (typeof index === 'number' && newDataArray[index]) {
+                      updates.push({
+                        key,
+                        value: {
+                          ...newDataArray[index],
+                          __dynamicIndex: index,
+                          __dynamicDataKey: dynamicDataKey,
+                          __isVirtualElement: true,
+                          __lastUpdated: Date.now()
+                        },
+                        operation: 'set'
+                      });
+                    }
+                  }
+                });
+                
+                if (updates.length > 0) {
+                  return restrictedContext.state.setBulk(updates);
+                }
+                return true;
+              },
+
+              // Get all virtual elements by data source
+              getByDataSource: (dynamicDataKey) => {
+                const allState = restrictedContext.state.getAll();
+                const virtualElements = {};
+                
+                Object.entries(allState).forEach(([key, value]) => {
+                  if (value?.__isVirtualElement && value?.__dynamicDataKey === dynamicDataKey) {
+                    virtualElements[key] = value;
+                  }
+                });
+                
+                return virtualElements;
+              },
+
+              // Clean up orphaned virtual elements
+              cleanup: (validElementIds = []) => {
+                const allState = restrictedContext.state.getAll();
+                const toDelete = [];
+                
+                Object.entries(allState).forEach(([key, value]) => {
+                  if (value?.__isVirtualElement && !validElementIds.includes(key)) {
+                    toDelete.push(key);
+                  }
+                });
+                
+                toDelete.forEach(key => {
+                  restrictedContext.state.delete(key);
+                });
+                
+                return toDelete.length;
               }
             },
 
@@ -8279,7 +8938,7 @@ return '';  // Return value will be stored in state if storeResult is true`,
               migrate: (fromScope, toScope, namespace = 'app', options = {}) => {
                 const { overwrite = false, deleteSource = false } = options;
                 const sourceKeys = restrictedContext.storage.getKeys(namespace, fromScope);
-                const migratedCount = 0;
+                let migratedCount = 0;
 
                 sourceKeys.forEach(key => {
                   const value = restrictedContext.storage.get(key, { namespace, scope: fromScope });
@@ -9034,12 +9693,38 @@ document,
                 }
               },
 
+              // Alias for backward compatibility
+              getQueryParams: () => {
+                try {
+                  const params = new URLSearchParams(window.location.search);
+                  const result = {};
+                  for (const [key, value] of params) {
+                    result[key] = value;
+                  }
+                  return result;
+                } catch (error) {
+                  console.error('Failed to get query params:', error);
+                  return {};
+                }
+              },
+
               getUrlParam: (key, defaultValue = null) => {
                 try {
                   const params = new URLSearchParams(window.location.search);
                   return params.get(key) || defaultValue;
                 } catch (error) {
                   console.error('Failed to get URL param:', error);
+                  return defaultValue;
+                }
+              },
+
+              // Alias for backward compatibility
+              getQueryParam: (key, defaultValue = null) => {
+                try {
+                  const params = new URLSearchParams(window.location.search);
+                  return params.get(key) || defaultValue;
+                } catch (error) {
+                  console.error('Failed to get query param:', error);
                   return defaultValue;
                 }
               },
@@ -9324,30 +10009,66 @@ document,
                 try {
                   const targetViewId = viewId || process?.pageId;
                   const element = restrictedContext.elements.get(elementId, targetViewId);
-                  
+
+                  console.log('➕ [shortcuts.addClass] Element ID:', elementId);
+                  console.log('➕ [shortcuts.addClass] Element found:', element);
+
                   if (!element) {
                     throw new Error(`Element ${elementId} not found`);
                   }
-                  
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+
+                  // Get current classes from multiple sources, checking all possible locations
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  console.log('➕ [shortcuts.addClass] Classes from state (classNames):', currentClasses);
+
+                  // If no classes in state, get from the actual element configuration
+                  // PRIORITY ORDER: configuration.classNames → element.classNames → configuration.className → style.className → element.className
+                  if (!currentClasses) {
+                    const fromConfigClassNames = element.configuration?.classNames || ''; // Check configuration.classNames first!
+                    const fromElementClassNames = element.classNames || '';
+                    const fromConfigClassName = element.configuration?.className || '';
+                    const fromStyleClassName = element.style?.className || '';
+                    const fromElementClassName = element.className || '';
+
+                    console.log('➕ [shortcuts.addClass] Classes from element.configuration.classNames:', fromConfigClassNames);
+                    console.log('➕ [shortcuts.addClass] Classes from element.classNames:', fromElementClassNames);
+                    console.log('➕ [shortcuts.addClass] Classes from element.configuration.className:', fromConfigClassName);
+                    console.log('➕ [shortcuts.addClass] Classes from element.style.className:', fromStyleClassName);
+                    console.log('➕ [shortcuts.addClass] Classes from element.className:', fromElementClassName);
+
+                    // Prefer configuration.classNames (plural) if available, fallback to other sources
+                    currentClasses = fromConfigClassNames || fromElementClassNames || fromConfigClassName || fromStyleClassName || fromElementClassName || '';
+                  }
+
+                  console.log('➕ [shortcuts.addClass] Final currentClasses:', currentClasses);
+                  console.log('➕ [shortcuts.addClass] Adding class:', className);
+
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
-                  
+                  console.log('➕ [shortcuts.addClass] Class array before adding:', classArray);
+
                   // Add new class if not already present
                   if (!classArray.includes(className)) {
                     classArray.push(className);
+                    console.log('➕ [shortcuts.addClass] Class added to array');
+                  } else {
+                    console.log('➕ [shortcuts.addClass] Class already exists, skipping');
                   }
-                  
+
                   // Update element with new classes
                   const newClassName = classArray.join(' ').trim();
+                  console.log('➕ [shortcuts.addClass] New className:', newClassName);
+
+                  // Update BOTH style.className AND configuration.classNames to ensure persistence
                   restrictedContext.elements.updateStyle(elementId, { className: newClassName }, targetViewId);
-                  
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassName);
-                  
+                  restrictedContext.elements.updateConfig(elementId, { classNames: newClassName }, targetViewId);
+
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassName);
+
+                  console.log('➕ [shortcuts.addClass] Successfully added class and updated both style and configuration');
                   return { success: true, className: newClassName, added: className };
                 } catch (error) {
-                  console.error('Failed to add class:', error);
+                  console.error('❌ [shortcuts.addClass] Failed to add class:', error);
                   return { success: false, error: error.message };
                 }
               },
@@ -9356,28 +10077,61 @@ document,
                 try {
                   const targetViewId = viewId || process?.pageId;
                   const element = restrictedContext.elements.get(elementId, targetViewId);
-                  
+
+                  console.log('🗑️ [shortcuts.removeClass] Element ID:', elementId);
+                  console.log('🗑️ [shortcuts.removeClass] Element found:', element);
+
                   if (!element) {
                     throw new Error(`Element ${elementId} not found`);
                   }
-                  
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+
+                  // Get current classes from multiple sources, checking all possible locations
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  console.log('🗑️ [shortcuts.removeClass] Classes from state (classNames):', currentClasses);
+
+                  // If no classes in state, get from the actual element configuration
+                  // PRIORITY ORDER: configuration.classNames → element.classNames → configuration.className → style.className → element.className
+                  if (!currentClasses) {
+                    const fromConfigClassNames = element.configuration?.classNames || ''; // Check configuration.classNames first!
+                    const fromElementClassNames = element.classNames || '';
+                    const fromConfigClassName = element.configuration?.className || '';
+                    const fromStyleClassName = element.style?.className || '';
+                    const fromElementClassName = element.className || '';
+
+                    console.log('🗑️ [shortcuts.removeClass] Classes from element.configuration.classNames:', fromConfigClassNames);
+                    console.log('🗑️ [shortcuts.removeClass] Classes from element.classNames:', fromElementClassNames);
+                    console.log('🗑️ [shortcuts.removeClass] Classes from element.configuration.className:', fromConfigClassName);
+                    console.log('🗑️ [shortcuts.removeClass] Classes from element.style.className:', fromStyleClassName);
+                    console.log('🗑️ [shortcuts.removeClass] Classes from element.className:', fromElementClassName);
+
+                    // Prefer configuration.classNames (plural) if available, fallback to other sources
+                    currentClasses = fromConfigClassNames || fromElementClassNames || fromConfigClassName || fromStyleClassName || fromElementClassName || '';
+                  }
+
+                  console.log('🗑️ [shortcuts.removeClass] Final currentClasses:', currentClasses);
+                  console.log('🗑️ [shortcuts.removeClass] Removing class:', className);
+
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
-                  
+                  console.log('🗑️ [shortcuts.removeClass] Class array before removal:', classArray);
+
                   // Remove specified class
                   const filteredClasses = classArray.filter(cls => cls !== className);
                   const newClassName = filteredClasses.join(' ').trim();
-                  
-                  // Update element
+
+                  console.log('🗑️ [shortcuts.removeClass] Class array after removal:', filteredClasses);
+                  console.log('🗑️ [shortcuts.removeClass] New className:', newClassName);
+
+                  // Update BOTH style.className AND configuration.classNames to ensure persistence
                   restrictedContext.elements.updateStyle(elementId, { className: newClassName }, targetViewId);
-                  
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassName);
-                  
+                  restrictedContext.elements.updateConfig(elementId, { classNames: newClassName }, targetViewId);
+
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassName);
+
+                  console.log('🗑️ [shortcuts.removeClass] Successfully removed class and updated both style and configuration');
                   return { success: true, className: newClassName, removed: className };
                 } catch (error) {
-                  console.error('Failed to remove class:', error);
+                  console.error('❌ [shortcuts.removeClass] Failed to remove class:', error);
                   return { success: false, error: error.message };
                 }
               },
@@ -9391,8 +10145,17 @@ document,
                     throw new Error(`Element ${elementId} not found`);
                   }
                   
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+                  // Get current classes from state first (using classNames - plural!)
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  
+                  // If no classes in state, get from the actual element configuration
+                  if (!currentClasses) {
+                    currentClasses = element.style?.className || 
+                                   element.configuration?.className || 
+                                   element.className || 
+                                   '';
+                  }
+                  
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
                   
                   let newClassName, action;
@@ -9412,10 +10175,10 @@ document,
                   // Update element
                   restrictedContext.elements.updateStyle(elementId, { className: newClassName }, targetViewId);
                   
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassName);
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassName);
                   
-                  return { success: true, className: newClassName, action, className: className };
+                  return { success: true, className: newClassName, action };
                 } catch (error) {
                   console.error('Failed to toggle class:', error);
                   return { success: false, error: error.message };
@@ -9431,8 +10194,17 @@ document,
                     throw new Error(`Element ${elementId} not found`);
                   }
                   
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+                  // Get current classes from state first (using classNames - plural!)
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  
+                  // If no classes in state, get from the actual element configuration
+                  if (!currentClasses) {
+                    currentClasses = element.style?.className || 
+                                   element.configuration?.className || 
+                                   element.className || 
+                                   '';
+                  }
+                  
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
                   
                   // Replace old class with new class
@@ -9442,8 +10214,8 @@ document,
                   // Update element
                   restrictedContext.elements.updateStyle(elementId, { className: newClassNameResult }, targetViewId);
                   
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassNameResult);
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassNameResult);
                   
                   return { 
                     success: true, 
@@ -9465,8 +10237,17 @@ document,
                     throw new Error(`Element ${elementId} not found`);
                   }
                   
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+                  // Get current classes from state first (using classNames - plural!)
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  
+                  // If no classes in state, get from the actual element configuration
+                  if (!currentClasses) {
+                    currentClasses = element.style?.className || 
+                                   element.configuration?.className || 
+                                   element.className || 
+                                   '';
+                  }
+                  
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
                   
                   return {
@@ -9490,8 +10271,17 @@ document,
                     throw new Error(`Element ${elementId} not found`);
                   }
                   
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+                  // Get current classes from state first (using classNames - plural!)
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  
+                  // If no classes in state, get from the actual element configuration
+                  if (!currentClasses) {
+                    currentClasses = element.style?.className || 
+                                   element.configuration?.className || 
+                                   element.className || 
+                                   '';
+                  }
+                  
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
                   
                   return {
@@ -9528,8 +10318,8 @@ document,
                   // Update element
                   restrictedContext.elements.updateStyle(elementId, { className: newClassName }, targetViewId);
                   
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassName);
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassName);
                   
                   return { 
                     success: true, 
@@ -9551,8 +10341,17 @@ document,
                     throw new Error(`Element ${elementId} not found`);
                   }
                   
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+                  // Get current classes from state first (using classNames - plural!)
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  
+                  // If no classes in state, get from the actual element configuration
+                  if (!currentClasses) {
+                    currentClasses = element.style?.className || 
+                                   element.configuration?.className || 
+                                   element.className || 
+                                   '';
+                  }
+                  
                   const currentArray = currentClasses.split(' ').filter(cls => cls.trim());
                   
                   // Handle additional classes input
@@ -9572,8 +10371,8 @@ document,
                   // Update element
                   restrictedContext.elements.updateStyle(elementId, { className: newClassName }, targetViewId);
                   
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassName);
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassName);
                   
                   return { 
                     success: true, 
@@ -9596,8 +10395,17 @@ document,
                     throw new Error(`Element ${elementId} not found`);
                   }
                   
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+                  // Get current classes from state first (using classNames - plural!)
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  
+                  // If no classes in state, get from the actual element configuration
+                  if (!currentClasses) {
+                    currentClasses = element.style?.className || 
+                                   element.configuration?.className || 
+                                   element.className || 
+                                   '';
+                  }
+                  
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
                   
                   // Remove classes containing the specified text
@@ -9607,8 +10415,8 @@ document,
                   // Update element
                   restrictedContext.elements.updateStyle(elementId, { className: newClassName }, targetViewId);
                   
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassName);
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassName);
                   
                   const removedCount = classArray.length - filteredClasses.length;
                   
@@ -9637,8 +10445,17 @@ document,
                     throw new Error('Filter function must be a function');
                   }
                   
-                  // Get current classes
-                  const currentClasses = element.style?.className || '';
+                  // Get current classes from state first (using classNames - plural!)
+                  let currentClasses = restrictedContext.state.get(`${elementId}.classNames`, '');
+                  
+                  // If no classes in state, get from the actual element configuration
+                  if (!currentClasses) {
+                    currentClasses = element.style?.className || 
+                                   element.configuration?.className || 
+                                   element.className || 
+                                   '';
+                  }
+                  
                   const classArray = currentClasses.split(' ').filter(cls => cls.trim());
                   
                   // Apply filter function
@@ -9648,8 +10465,8 @@ document,
                   // Update element
                   restrictedContext.elements.updateStyle(elementId, { className: newClassName }, targetViewId);
                   
-                  // Update state
-                  restrictedContext.state.set(`${elementId}.className`, newClassName);
+                  // Update state (using classNames - plural!)
+                  restrictedContext.state.set(`${elementId}.classNames`, newClassName);
                   
                   const removedCount = classArray.length - filteredClasses.length;
                   
@@ -9673,10 +10490,48 @@ document,
                     blueprint,
                     targetContainer,
                     data = [],
+                    dynamicDataKey,
                     renderType = 'renderInto',
                     mappings = [],
                     defaults = {},
                   } = options;
+
+                  // Resolve dynamic data if dynamicDataKey is provided
+                  let resolvedData = data;
+                  if (dynamicDataKey) {
+                    try {
+                      // Handle template strings like "{{state.todos}}"
+                      if (typeof dynamicDataKey === 'string' && dynamicDataKey.includes('{{')) {
+                        resolvedData = retrieveBody(
+                          null,
+                          dynamicDataKey,
+                          process?.event,
+                          process?.globalObj,
+                          process?.paramState,
+                          process?.sessionKey,
+                          {
+                            compId: targetContainer,
+                            store: process?.store,
+                            pageId: process?.pageId,
+                          }
+                        );
+                      } else {
+                        // Direct state path like "state.todos"
+                        const keys = dynamicDataKey.replace(/^state\./, '').split('.');
+                        resolvedData = keys.reduce((obj, key) => obj?.[key], globalObj);
+                      }
+                      
+                      if (!Array.isArray(resolvedData)) {
+                        console.warn('Dynamic data key did not resolve to an array:', dynamicDataKey, resolvedData);
+                        resolvedData = [];
+                      }
+                      
+                      console.log(`🔄 Resolved dynamic data from "${dynamicDataKey}":`, resolvedData?.length, 'items');
+                    } catch (error) {
+                      console.error('Error resolving dynamic data key:', error);
+                      resolvedData = [];
+                    }
+                  }
 
                   if (!blueprint) {
                     throw new Error('Blueprint is required');
@@ -9693,7 +10548,7 @@ document,
                   if (typeof renderElementUtil === 'function') {
 
             
-                    data?.map((item,i)=>{
+                    resolvedData?.map((item,i)=>{
                       const process1 = {
                         ...process,
                         name: i,
@@ -9705,7 +10560,8 @@ document,
                           targetElement: targetContainer,
                           renderType,
                           mappings,
-                          defaults
+                          defaults,
+                          dynamicDataKey
                         }
                       };
     
@@ -9713,11 +10569,11 @@ document,
                       renderElementUtil(process1);
                     })
                   
-                    return { success: true, blueprint, targetContainer, renderType, dataLength: data.length };
+                    return { success: true, blueprint, targetContainer, renderType, dataLength: resolvedData.length };
                   } else {
                     // Fallback: store configuration for manual processing
                     const configKey = `renderConfig.${Date.now()}`;
-                    restrictedContext.state.set(configKey, { blueprint, targetContainer, renderType, mappings, defaults, data });
+                    restrictedContext.state.set(configKey, { blueprint, targetContainer, renderType, mappings, defaults, data: resolvedData });
                     return { success: true, configKey, message: 'Configuration stored, manual processing required' };
                   }
                 } catch (error) {
@@ -9847,7 +10703,31 @@ document,
               http: {
                 // Global configuration
                 config: {
+                  // Custom base URL storage
+                  _customBaseURL: null,
+                  
+                  // Set custom base URL
+                  setBaseURL: (url) => {
+                    if (typeof url !== 'string') {
+                      throw new Error('Base URL must be a string');
+                    }
+                    restrictedContext.config._customBaseURL = url.replace(/\/$/, ''); // Remove trailing slash
+                    return true;
+                  },
+                  
+                  // Clear custom base URL (revert to default)
+                  clearBaseURL: () => {
+                    restrictedContext.config._customBaseURL = null;
+                    return true;
+                  },
+                  
+                  // Get current base URL (custom or default)
                   get baseURL() {
+                    // Return custom URL if set
+                    if (restrictedContext.config._customBaseURL) {
+                      return restrictedContext.config._customBaseURL;
+                    }
+                    
                     // Get current app ID from store
                     let appId = 'default';
                     try {
@@ -9865,6 +10745,31 @@ document,
                     const environment = import.meta.env.VITE_ISDEPLOYED ? 'production' : 'development';
                     return `${import.meta.env.VITE_CLIENT_API_URL}/v1/apps/${environment}/${appId}`;
                   },
+                  
+                  // Get the default base URL (ignoring custom setting)
+                  get defaultBaseURL() {
+                    let appId = 'default';
+                    try {
+                      if (process.store) {
+                        const rootState = process.store.getState();
+                        const currentApplication = rootState.currentAppState?.currentApplication;
+                        if (currentApplication?._id) {
+                          appId = currentApplication._id;
+                        }
+                      }
+                    } catch (error) {
+                      console.warn('Could not get app ID from store, using default:', error);
+                    }
+                    
+                    const environment = import.meta.env.VITE_ISDEPLOYED ? 'production' : 'development';
+                    return `${import.meta.env.VITE_CLIENT_API_URL}/v1/apps/${environment}/${appId}`;
+                  },
+                  
+                  // Check if custom base URL is set
+                  get hasCustomBaseURL() {
+                    return restrictedContext.config._customBaseURL !== null;
+                  },
+                  
                   timeout: 10000,
                   headers: {
                     'Content-Type': 'application/json',
@@ -10059,6 +10964,7 @@ document,
 
                 // Basic HTTP methods
                 get: async (url, options = {}) => {
+                  let requestId;
                   try {
                     // Auto-initialize base URL if not set
                     if (!restrictedContext.shortcuts.http.config.baseURL) {
@@ -10071,11 +10977,27 @@ document,
                       method: 'GET'
                     };
 
+                    // Log network request
+                    requestId = networkLogger.logRequest({
+                      method: 'GET',
+                      url: url,
+                      headers: config.headers,
+                      body: null
+                    });
+
                     const response = await axios({
                       url,
                       ...config,
                       params: options.params || {},
                       timeout: options.timeout || config.timeout
+                    });
+
+                    // Log successful response
+                    networkLogger.logResponse(requestId, {
+                      status: response.status,
+                      statusText: response.statusText,
+                      headers: response.headers,
+                      data: response.data
                     });
 
                     return {
@@ -10086,6 +11008,11 @@ document,
                       config: response.config
                     };
                   } catch (error) {
+                    // Log error response
+                    if (requestId) {
+                      networkLogger.logError(requestId, error);
+                    }
+
                     const errorResponse = {
                       success: false,
                       error: error.message,
@@ -10111,6 +11038,7 @@ document,
                 },
 
                 post: async (url, data, options = {}) => {
+                  let requestId;
                   try {
                     const config = {
                       ...restrictedContext.shortcuts.http.config,
@@ -10118,11 +11046,27 @@ document,
                       method: 'POST'
                     };
 
+                    // Log network request
+                    requestId = networkLogger.logRequest({
+                      method: 'POST',
+                      url: url,
+                      headers: config.headers,
+                      body: data
+                    });
+
                     const response = await axios({
                       url,
                       data,
                       ...config,
                       timeout: options.timeout || config.timeout
+                    });
+
+                    // Log successful response
+                    networkLogger.logResponse(requestId, {
+                      status: response.status,
+                      statusText: response.statusText,
+                      headers: response.headers,
+                      data: response.data
                     });
 
                     return {
@@ -10133,6 +11077,11 @@ document,
                       config: response.config
                     };
                   } catch (error) {
+                    // Log error response
+                    if (requestId) {
+                      networkLogger.logError(requestId, error);
+                    }
+
                     const errorResponse = {
                       success: false,
                       error: error.message,
@@ -10466,7 +11415,23 @@ document,
           // Store operation result
           globalObj[process.name] = execResult
 
-          messageLogger.success(`Code execution completed successfully (${executionTime}ms)`);
+          // Enhanced success logging
+          console.log('✅ ExecuteCode Step Completed:', {
+            stepName: process.name,
+            executionTime: `${executionTime}ms`,
+            resultType: typeof execResult,
+            hasResult: execResult !== undefined,
+            timestamp: new Date().toISOString()
+          });
+          messageLogger.success(`ExecuteCode step '${process.name}' completed successfully (${executionTime}ms)`, {
+            stepName: process.name,
+            compId: process.compId,
+            pageId: process.pageId,
+            executionTime,
+            resultType: typeof execResult,
+            hasResult: execResult !== undefined,
+            metrics
+          });
         } catch (error) {
           // Comprehensive error handling
           const errorDetails = {
@@ -10485,8 +11450,41 @@ document,
           // Store error information
           globalErrors[process.name] = errorDetails;
 
-          // Log error with context
-          messageLogger.error(`Code execution failed: ${error.message}`, errorDetails);
+          // Enhanced console error logging
+          console.error('🚨 ExecuteCode Step Failed:', {
+            stepName: process.name,
+            error: error.message,
+            errorType: error.name || 'Unknown',
+            stack: error.stack,
+            code: process.code,
+            timestamp: new Date().toISOString(),
+            context: {
+              timeout: process.timeout,
+              memoryLimit: process.memoryLimit,
+              codeLength: process.code?.length || 0
+            }
+          });
+
+          // Enhanced messageLogger error with full context
+          messageLogger.error(`ExecuteCode step '${process.name}' failed: ${error.message}`, {
+            ...errorDetails,
+            compId: process.compId,
+            pageId: process.pageId,
+            fullError: {
+              name: error.name,
+              message: error.message,
+              stack: error.stack
+            }
+          });
+
+          // Also log to messageLogger with different levels for visibility
+          messageLogger.warn(`Code execution context`, {
+            stepName: process.name,
+            compId: process.compId,
+            pageId: process.pageId,
+            codePreview: process.code?.substring(0, 300) + '...',
+            codeLength: process.code?.length || 0
+          });
 
           // Re-throw with sanitized message
           throw new Error(`Code execution failed: ${(error.message)}`);

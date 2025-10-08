@@ -590,9 +590,9 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
   };
 
   const Section = ({ title, icon: Icon, children, sectionKey }) => (
-    <div className="border-b border-neutral-800">
+    <div className="border-b border-[#323232]">
       <button
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-neutral-900 text-neutral-300"
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-[#202020] text-neutral-300"
         onClick={() => toggleSection(sectionKey)}
       >
         <div className="flex items-center gap-2">
@@ -608,7 +608,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
   const Select = ({ value, onChange, options, placeholder = 'Select...' }) => (
     <select
       value={value}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-xs text-neutral-300 focus:outline-none focus:border-blue-500"
+      className="w-full bg-[#2a2a2a] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-neutral-300 focus:outline-none focus:border-blue-500"
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="">{placeholder}</option>
@@ -625,7 +625,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
       type={type}
       value={value}
       placeholder={placeholder}
-      className="w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-xs text-neutral-300 focus:outline-none focus:border-blue-500"
+      className="w-full bg-[#2a2a2a] border border-[#2a2a2a] rounded px-2 py-1 text-xs text-neutral-300 focus:outline-none focus:border-blue-500"
       onChange={(e) => onChange(e.target.value)}
     />
   );
@@ -633,7 +633,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
   const StateTab = ({ state, label, isActive, onClick }) => (
     <button
       className={`px-2 py-1 text-xs rounded ${
-        isActive ? 'bg-blue-600 text-white' : 'bg-neutral-900 text-neutral-400 hover:bg-neutral-700'
+        isActive ? 'bg-blue-600 text-white' : 'bg-[#202020] text-neutral-400 hover:bg-neutral-700'
       }`}
       onClick={onClick}
     >
@@ -644,14 +644,14 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
   const currentState = activeStateTab === 'base' ? controlledProperties : controlledProperties[activeStateTab] || {};
 
   return (
-    <div className="w-full bg-neutral-950 text-neutral-300 h-screen overflow-y-auto border-l border-neutral-800">
+    <div className="w-full bg-[#141414] text-neutral-300 h-screen overflow-y-auto border-l border-[#323232]">
       {}
-      <div className="p-3 border-b border-neutral-800">
+      <div className="p-3 border-b border-[#323232]">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-white">Properties</h2>
           <button
             className={`p-1.5 rounded text-xs transition-colors ${
-              copied ? 'bg-green-600 text-white' : 'bg-neutral-900 hover:bg-neutral-700 text-neutral-300'
+              copied ? 'bg-green-600 text-white' : 'bg-[#202020] hover:bg-neutral-700 text-neutral-300'
             }`}
             onClick={copyToClipboard}
           >
@@ -660,13 +660,13 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
         </div>
 
         {}
-        <div className="bg-neutral-900 rounded p-2 text-xs font-mono text-neutral-400 break-all">
+        <div className="bg-[#202020] rounded p-2 text-xs font-mono text-neutral-400 break-all">
           {generateClassName() || 'No classes'}
         </div>
       </div>
 
       {}
-      <div className="p-3 border-b border-neutral-800">
+      <div className="p-3 border-b border-[#323232]">
         <div className="flex gap-1 mb-2">
           <StateTab
             state="base"
@@ -1210,7 +1210,7 @@ const FigmaTailwindEditor = ({ value = '', onChange }) => {
             <div className="space-y-1">
               <label className="block text-xs text-neutral-400">Current Custom Classes:</label>
               {preservedClasses.map((cls, index) => (
-                <div key={index} className="flex items-center justify-between bg-neutral-900 rounded px-2 py-1">
+                <div key={index} className="flex items-center justify-between bg-[#202020] rounded px-2 py-1">
                   <span className="text-xs font-mono text-neutral-300">{cls}</span>
                   <button className="p-0.5 text-neutral-400 hover:text-red-400" onClick={() => removePreservedClass(index)}>
                     <X size={10} />

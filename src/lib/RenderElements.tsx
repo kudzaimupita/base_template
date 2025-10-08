@@ -6,13 +6,14 @@ import ErrorBoundary from './ErrorBoundary';
 import VirtualElementWrapper from './VitualElementWrapper';
 import { flattenStyleObject } from './flattenStyleObject';
 import { generateComponentGroups } from './list';
-import { debounce, isEmpty } from 'lodash';
+// Remove lodash dependency - use native checks instead
 import { processController } from './digest/digester';
 import renderElementUtil from './renderElementUtil';
 import { retrieveBody } from './digest/state/utils';
 import DebugWrapper from './effectWrapper';
 import { twMerge } from 'tailwind-merge';
 import { useParams } from 'react-router-dom';
+import { SimpleOverrideManager } from './SimpleOverrideManager';
 import {
   convertParentViewToLayoutItem,
   createEventHandlers,
@@ -25,6 +26,7 @@ import {
 import { message } from 'antd';
 import { SortableContainerSetup } from './Setup';
 import { SimpleDndKit, SimpleSortableItem } from './SimpleDndKit';
+import { SpacingOverlay } from '@/lib/spacing-editor/SpacingOverlay';
 
 // Global state to track sortable operations and prevent conflicts
 let isSortableOperationActive = false;
@@ -82,14 +84,157 @@ const processElement = (oldItem) => {
 
 const elementCache = new WeakMap();
 
+// Advanced caching system with depth awareness
+class DepthAwareCache {
+  private cache: Map<string, { data: any; depth: number; timestamp: number; hits: number }>;
+  private maxSize: number;
+  private maxAge: number;
+
+  constructor(maxSize = 1000, maxAge = 60000) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+    this.maxAge = maxAge; // milliseconds
+  }
+
+  get(key: string, currentDepth: number): any | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    // Check if cache entry is stale
+    if (Date.now() - entry.timestamp > this.maxAge) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    // Only use cache if depth matches (prevents using shallow cache for deep renders)
+    if (entry.depth !== currentDepth) {
+      return null;
+    }
+
+    // Update hit count for LRU tracking
+    entry.hits++;
+    entry.timestamp = Date.now();
+
+    return entry.data;
+  }
+
+  set(key: string, data: any, depth: number): void {
+    // Implement LRU eviction if cache is full
+    if (this.cache.size >= this.maxSize) {
+      this.evictLeastUsed();
+    }
+
+    this.cache.set(key, {
+      data,
+      depth,
+      timestamp: Date.now(),
+      hits: 0,
+    });
+  }
+
+  private evictLeastUsed(): void {
+    let leastUsedKey: string | null = null;
+    let leastHits = Infinity;
+    let oldestTime = Infinity;
+
+    for (const [key, entry] of this.cache.entries()) {
+      // Prioritize evicting old, rarely-hit entries
+      if (entry.hits < leastHits || (entry.hits === leastHits && entry.timestamp < oldestTime)) {
+        leastUsedKey = key;
+        leastHits = entry.hits;
+        oldestTime = entry.timestamp;
+      }
+    }
+
+    if (leastUsedKey) {
+      this.cache.delete(leastUsedKey);
+    }
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  getStats() {
+    return {
+      size: this.cache.size,
+      maxSize: this.maxSize,
+      entries: Array.from(this.cache.entries()).map(([key, entry]) => ({
+        key,
+        depth: entry.depth,
+        hits: entry.hits,
+        age: Date.now() - entry.timestamp,
+      })),
+    };
+  }
+}
+
+// Global cache instance for component rendering
+const componentRenderCache = new DepthAwareCache(500, 30000); // 500 entries, 30 second TTL
+
+// Configuration for maximum nesting depth to prevent stack overflow
+// Set to browser's practical limit (way higher than 100!)
+// Modern browsers can handle 10,000+ levels before stack overflow
+// We set a conservative limit that's still extremely high
+const MAX_NESTING_DEPTH = 10000; // Browser's practical limit (not arbitrary)
+const MAX_CIRCULAR_REFS = 3; // Maximum times an element can appear (detects circular refs quickly)
+
+// Enhanced rendering stack with depth tracking and circular reference detection
+class RenderingTracker {
+  private stack: Map<string, number>; // elementId -> occurrence count
+  private depth: number;
+
+  constructor(existingTracker?: RenderingTracker) {
+    this.stack = existingTracker ? new Map(existingTracker.stack) : new Map();
+    this.depth = existingTracker ? existingTracker.depth : 0;
+  }
+
+  canRender(elementId: string, elementType: 'component' | 'virtual' | 'ref'): { allowed: boolean; reason?: string } {
+    // Check depth limit
+    if (this.depth >= MAX_NESTING_DEPTH) {
+      return {
+        allowed: false,
+        reason: `Maximum nesting depth of ${MAX_NESTING_DEPTH} exceeded`,
+      };
+    }
+
+    // Check circular references
+    const currentCount = this.stack.get(elementId) || 0;
+    if (currentCount >= MAX_CIRCULAR_REFS) {
+      return {
+        allowed: false,
+        reason: `Circular reference detected: ${elementId} appears ${currentCount} times in rendering stack`,
+      };
+    }
+
+    return { allowed: true };
+  }
+
+  enter(elementId: string): RenderingTracker {
+    const newTracker = new RenderingTracker(this);
+    newTracker.stack.set(elementId, (newTracker.stack.get(elementId) || 0) + 1);
+    newTracker.depth += 1;
+    return newTracker;
+  }
+
+  getDepth(): number {
+    return this.depth;
+  }
+
+  getPath(): string[] {
+    return Array.from(this.stack.keys());
+  }
+}
+
 interface ElementItemProps {
   item: any;
   index: number;
   allElements: any[];
   renderingStack?: Set<any>;
+  renderingTracker?: RenderingTracker; // New enhanced tracker
 }
 const ElementItem = React.memo(
-  ({ item: oldItem, index, allElements, renderingStack = new Set() }: ElementItemProps) => {
+  ({ item: oldItem, index, allElements, renderingStack = new Set(), renderingTracker = new RenderingTracker() }: ElementItemProps) => {
     const context = useElementRenderer();
 
     // Check if we should use sortable
@@ -124,7 +269,15 @@ const ElementItem = React.memo(
       setSessionInfo,
       storeInvocation,
       setItemToEdit,
+      scale,
+      containerRef,
+      isMoving,
     } = context;
+
+    // Debug scale in ElementItem
+    useEffect(() => {
+      console.log('🔍 ElementItem - scale from context:', scale, 'for element:', oldItem?.i);
+    }, [scale, oldItem?.i]);
 
     // State for tracking overrides refresh
     const [overridesRefreshKey, setOverridesRefreshKey] = useState(0);
@@ -151,8 +304,13 @@ const ElementItem = React.memo(
     useEffect(() => {
       if (lastEditModeRef.current !== editMode || lastTabRef.current !== tab) {
         setEventHandlersRefreshKey((prev) => prev + 1);
+        // Also refresh overrides when switching modes to ensure latest changes are reflected
+        setOverridesRefreshKey((prev) => prev + 1);
         lastEditModeRef.current = editMode;
         lastTabRef.current = tab;
+        
+        // Log mode changes for debugging
+        console.log(`[${oldItem?.i}] Mode changed - editMode: ${editMode}, tab: ${tab}`);
       }
     }, [editMode, tab]);
 
@@ -168,36 +326,55 @@ const ElementItem = React.memo(
     const [isHovered, setisHovered] = useState(false);
     const hasInitialized = useRef(false);
     const initializationKey = useRef(null);
+    const lastProcessingTime = useRef(0);
 
     // Optimize children management with batching - avoid conflicts with SortableJS
+    const ensureChildrenInGlobalElementsRef = useRef(null);
     const ensureChildrenInGlobalElements = useCallback(
       (childElements) => {
         if (!childElements || childElements.length === 0) return;
 
-        // Check if we're in the middle of a sortable operation to avoid conflicts
-        if (isSortableCurrentlyActive()) {
-          // Defer until sortable operation is complete
-          const timeout = setTimeout(() => ensureChildrenInGlobalElements(childElements), 200);
-          sortableOperationTimeouts.add(timeout);
-          return;
+        // Debounce to prevent rapid fire calls
+        if (ensureChildrenInGlobalElementsRef.current) {
+          clearTimeout(ensureChildrenInGlobalElementsRef.current);
         }
 
-        // Use a more conservative approach without requestAnimationFrame to avoid timing conflicts
-        setElements?.((currentElements) => {
-          const elementsMap = new Map(currentElements.map((el) => [el.i, el]));
-          let hasChanges = false;
+        ensureChildrenInGlobalElementsRef.current = setTimeout(() => {
+          // Check if we're in the middle of a sortable operation to avoid conflicts
+          if (isSortableCurrentlyActive()) {
+            // Defer until sortable operation is complete
+            const timeout = setTimeout(() => ensureChildrenInGlobalElements(childElements), 200);
+            sortableOperationTimeouts.add(timeout);
+            return;
+          }
 
-          const newElements = childElements.filter((childEl) => {
-            if (childEl && childEl.i && !elementsMap.has(childEl.i)) {
-              elementsMap.set(childEl.i, childEl);
-              hasChanges = true;
-              return true;
+          // Use a more conservative approach without requestAnimationFrame to avoid timing conflicts
+          setElements?.((currentElements) => {
+            if (!currentElements || !Array.isArray(currentElements)) {
+              return currentElements;
             }
-            return false;
-          });
 
-          return hasChanges ? Array.from(elementsMap.values()) : currentElements;
-        });
+            const elementsMap = new Map(currentElements.map((el) => [el.i, el]));
+            let hasChanges = false;
+
+            const newElements = childElements.filter((childEl) => {
+              if (childEl && childEl.i && !elementsMap.has(childEl.i)) {
+                elementsMap.set(childEl.i, childEl);
+                hasChanges = true;
+                return true;
+              }
+              return false;
+            });
+
+            // Only return new array if there are actual changes
+            if (hasChanges) {
+              return Array.from(elementsMap.values());
+            }
+            
+            // Return the same reference to prevent unnecessary re-renders
+            return currentElements;
+          });
+        }, 50);
       },
       [setElements]
     );
@@ -205,15 +382,15 @@ const ElementItem = React.memo(
     // Optimize overrides processing with better error handling and caching
     const processOverrides = useCallback(
       async (overrides, eventType) => {
+      
         if (!overrides || overrides.length === 0) return;
 
-        const validOverrides = overrides.filter((key) => !isEmpty(key));
+        const validOverrides = overrides.filter((key) => key && Object.keys(key).length > 0);
         if (validOverrides.length === 0) return;
-  
+       
         // Process overrides in parallel with error isolation
         const results = await Promise.allSettled(
           validOverrides.map(async (key) => {
-       
             return processController(
               key,
               {},
@@ -332,32 +509,28 @@ const ElementItem = React.memo(
       return text;
     }, [appState, tab, currentApplication?._id, item?.i, store]);
 
+    // Memoize overrides array to prevent infinite loops
+    const stableOverrides = useMemo(() => {
+      return item?.configuration?._overrides_ || [];
+    }, [item?.configuration?._overrides_]);
+
     // Dynamic dependencies for each override with dependencies
     const overrideDependencies = useMemo(() => {
-      const overrides = item?.configuration?._overrides_ || [];
       const deps = new Map();
       
-      overrides.forEach((override, index) => {
+      stableOverrides.forEach((override, index) => {
         if (override?.dependencies && Array.isArray(override.dependencies)) {
-          const resolvedDeps = override.dependencies.map(depString => 
-            resolveDependencyValue(depString)
-          );
+          // Store the dependency strings, resolve them later to avoid infinite loops
           deps.set(index, {
             override,
             dependencies: override.dependencies,
-            resolvedValues: resolvedDeps,
+            // Don't resolve values here - do it in getOverridesToTrigger
           });
         }
       });
       
       return deps;
-    }, [
-      item?.configuration?._overrides_, 
-      resolveDependencyValue,
-      appState, // Add appState to dependencies to trigger when state changes
-      tab,
-      store
-    ]);
+    }, [stableOverrides]);
 
     // Track previous dependency values to detect changes
     const prevDependencyValues = useRef(new Map());
@@ -375,9 +548,13 @@ const ElementItem = React.memo(
           return;
         }
 
+        // Resolve dependency values here to avoid infinite loops in useMemo
+        const currentValues = depInfo.dependencies.map(depString => 
+          resolveDependencyValue(depString)
+        );
+        
         // Check if any dependency values have changed
         const prevValues = prevDependencyValues.current.get(index) || [];
-        const currentValues = depInfo.resolvedValues || [];
         
         let hasChanged = false;
         
@@ -404,26 +581,38 @@ const ElementItem = React.memo(
       return toTrigger;
     }, [overrideDependencies]);
 
-    // Enhanced processOverrides that only triggers changed dependencies
+    // Enhanced processOverrides that only triggers changed dependencies with debouncing
     const processOverridesWithDependencies = useCallback(
       async (overrides, eventType) => {
         if (!overrides || overrides.length === 0) return;
+
+        // Debounce to prevent double processing within 100ms (increased from 50ms)
+        const now = Date.now();
+        if (now - lastProcessingTime.current < 100) {
+          console.log(`[${item?.i}] Debounced override processing for ${eventType}`);
+          return;
+        }
+        lastProcessingTime.current = now;
+
+        console.log(`[${item?.i}] Processing overrides for ${eventType}`);
 
         // Get only the overrides that should be triggered
         const overridesToTrigger = getOverridesToTrigger(overrides, eventType);
         
         if (overridesToTrigger.length === 0) {
+          console.log(`[${item?.i}] No overrides to trigger for ${eventType}`);
           return;
         }
 
-        
+        console.log(`[${item?.i}] Triggering ${overridesToTrigger.length} overrides for ${eventType}`);
+
         // Use the original processOverrides logic but with filtered overrides
         await processOverrides(overridesToTrigger, eventType);
       },
-      [processOverrides, getOverridesToTrigger]
+      [processOverrides, getOverridesToTrigger, item?.i]
     );
 
-    // Optimize initialization with better dependency tracking
+    // Combined effect for initialization and dependency changes
     useEffect(() => {
       const currentKey = `${item?.i}-${currentApplication?._id}`;
 
@@ -431,31 +620,45 @@ const ElementItem = React.memo(
         return;
       }
 
-      if (hasInitialized.current && initializationKey.current === currentKey) {
-        return;
-      }
-
-      const initializeComponent = async () => {
-        hasInitialized.current = true;
-        initializationKey.current = currentKey;
-
-        const overrides = item?.configuration?._overrides_ || [];
-        const mountOverrides = overrides.filter((key) => !key?.isCleanUp);
-
-        if (mountOverrides.length > 0) {
-          await processOverridesWithDependencies(mountOverrides, 'onMount');
+      const processOverridesForElement = async () => {
+        // Block overrides in edit mode - only execute in preview mode
+        if (editMode) {
+          console.log(`[${item?.i}] ✋ BLOCKED: Edit mode - overrides disabled`);
+          return;
         }
+        
+        // Simple override execution check - prevents infinite loops and double execution
+        if (!SimpleOverrideManager.shouldExecute(currentApplication?._id, item?.i)) {
+          return;
+        }
+
+        const mountOverrides = stableOverrides.filter((key) => !key?.isCleanUp);
+
+        if (mountOverrides.length === 0) return;
+
+        // Determine event type based on initialization state
+        const isInitializing = !hasInitialized.current || initializationKey.current !== currentKey;
+        const eventType = isInitializing ? 'onMount' : 'onDependencyChange';
+
+        if (isInitializing) {
+          hasInitialized.current = true;
+          initializationKey.current = currentKey;
+          console.log(`[${item?.i}] Initializing component`);
+        } else {
+          console.log(`[${item?.i}] Dependencies changed`);
+        }
+
+        await processOverridesWithDependencies(mountOverrides, eventType);
       };
 
-      // Debounce initialization to prevent rapid fire
-      const timer = setTimeout(initializeComponent, 0);
+      // Debounce to prevent rapid fire
+      const timer = setTimeout(processOverridesForElement, 0);
 
       return () => {
         clearTimeout(timer);
 
         const processCleanup = async () => {
-          const overrides = item?.configuration?._overrides_ || [];
-          const cleanupOverrides = overrides.filter((key) => key?.isCleanUp);
+          const cleanupOverrides = stableOverrides.filter((key) => key?.isCleanUp);
 
           if (cleanupOverrides.length > 0) {
             await processOverrides(cleanupOverrides, 'onUnmount');
@@ -470,38 +673,9 @@ const ElementItem = React.memo(
       item?.i,
       currentApplication?._id,
       readOnly,
-      // processOverridesWithDependencies,
-      item?.configuration?._overrides_,
-      // JSON.stringify(item?.configuration?._overrides_),
-      // overridesRefreshKey,
+      stableOverrides,
+      overrideDependencies,
       tab
-    ]);
-
-    // Additional useEffect to trigger overrides when dependencies change (not just on mount)
-    useEffect(() => {
-      if (!item?.i || !currentApplication?._id || readOnly || !allElements?.length) {
-        return;
-      }
-
-      // Skip if not initialized yet
-      if (!hasInitialized.current) {
-        return;
-      }
-
-      const overrides = item?.configuration?._overrides_ || [];
-      const mountOverrides = overrides.filter((key) => !key?.isCleanUp);
-
-      if (mountOverrides.length > 0) {
-        // This will only trigger overrides whose dependencies actually changed
-        processOverridesWithDependencies(mountOverrides, 'onDependencyChange');
-      }
-    }, [
-      overrideDependencies, // This will trigger when any dependency value changes
-      // processOverridesWithDependencies,
-      item?.i,
-      currentApplication?._id,
-      readOnly,
-      allElements?.length
     ]);
 
     // Cache processed components globally
@@ -583,6 +757,171 @@ const ElementItem = React.memo(
       isTargeted,
     ]);
 
+    // Track resolution to prevent infinite loops with timestamp
+    const isResolvingRef = useRef(false);
+    const lastResolveTime = useRef(0);
+
+    // Resolve dynamic data for virtual elements - SIMPLIFIED TO STOP INFINITE LOOP
+    const resolvedAppStateData = useMemo(() => {
+      return appState?.[item?.i];
+    }, [appState?.[item?.i]]);
+
+    // Watch for changes to dynamic data and update ALL virtual elements with the same data source
+    useEffect(() => {
+      console.log(`🔍 [${item.i}] useEffect triggered for dynamic data watcher`);
+      console.log(`🔍 [${item.i}] Dependencies:`, {
+        isVirtual: item?.isVirtual,
+        isVirtualElement: resolvedAppStateData?.__isVirtualElement,
+        dynamicDataKey: resolvedAppStateData?.__dynamicDataKey,
+        dynamicIndex: resolvedAppStateData?.__dynamicIndex,
+        todosLength: appState?.todos?.length,
+        firstTodoCompleted: appState?.todos?.[0]?.completed
+      });
+      
+      if (!item?.isVirtual || !resolvedAppStateData?.__isVirtualElement) {
+        console.log(`🔍 [${item.i}] Skipping - not virtual or not virtual element`);
+        return;
+      }
+      
+      const dynamicDataKey = resolvedAppStateData.__dynamicDataKey;
+      const dynamicIndex = resolvedAppStateData.__dynamicIndex;
+      
+      if (!dynamicDataKey || typeof dynamicIndex !== 'number') return;
+      
+      // Resolve the current data array from appState
+      let currentDataArray;
+      try {
+        if (typeof dynamicDataKey === 'string' && dynamicDataKey.includes('{{')) {
+          // Handle template strings like "{{state.todos}}"
+          const path = dynamicDataKey.replace(/^\{\{state\./, '').replace(/\}\}$/, '');
+          const keys = path.split('.');
+          currentDataArray = keys.reduce((obj, key) => obj?.[key], appState);
+        } else if (dynamicDataKey) {
+          // Direct state path like "state.todos"
+          const keys = dynamicDataKey.replace(/^state\./, '').split('.');
+          currentDataArray = keys.reduce((obj, key) => obj?.[key], appState);
+        }
+        
+        // Get the current item from the array
+        if (Array.isArray(currentDataArray) && currentDataArray[dynamicIndex]) {
+          const currentItem = currentDataArray[dynamicIndex];
+          
+          // Check if the current item is different from what's stored
+          const storedData = { ...resolvedAppStateData };
+          delete storedData.__dynamicIndex;
+          delete storedData.__dynamicDataKey;
+          delete storedData.__isVirtualElement;
+          delete storedData.__lastUpdated;
+          
+          const currentData = { ...currentItem };
+          
+          // Only update if data has actually changed
+          if (JSON.stringify(storedData) !== JSON.stringify(currentData)) {
+            console.log(`🔄 [${item.i}] Dynamic data changed, updating ALL virtual elements with same data source`);
+            
+            // Find ALL virtual elements that use the same dynamicDataKey
+            const updateAllVirtualElementsWithSameDataSource = () => {
+              if (!setAppStatePartial || !dispatch || !allElements) return;
+              
+              // Find all virtual elements that share the same dynamicDataKey
+              const virtualElementsToUpdate = [];
+              
+              // Check appState for all virtual elements with the same dynamicDataKey
+              Object.keys(appState || {}).forEach(key => {
+                const stateData = appState[key];
+                if (stateData?.__isVirtualElement && stateData?.__dynamicDataKey === dynamicDataKey) {
+                  const elementIndex = stateData.__dynamicIndex;
+                  if (typeof elementIndex === 'number' && currentDataArray[elementIndex]) {
+                    virtualElementsToUpdate.push({
+                      elementId: key,
+                      index: elementIndex,
+                      newData: currentDataArray[elementIndex]
+                    });
+                  }
+                }
+              });
+              
+              console.log(`🔄 Found ${virtualElementsToUpdate.length} virtual elements to update:`, virtualElementsToUpdate.map(v => v.elementId));
+              
+              // Update all virtual elements
+              virtualElementsToUpdate.forEach(({ elementId, index, newData }) => {
+                const dynamicReference = {
+                  ...newData,
+                  // Add metadata for dynamic resolution
+                  __dynamicIndex: index,
+                  __dynamicDataKey: dynamicDataKey,
+                  __isVirtualElement: true,
+                  __lastUpdated: Date.now(),
+                };
+                
+                console.log(`🔄 [${elementId}] Updating virtual element:`, dynamicReference);
+                dispatch(
+                  setAppStatePartial({
+                    key: elementId,
+                    payload: dynamicReference,
+                  })
+                );
+              });
+            };
+            
+            // Call the function to update all virtual elements
+            updateAllVirtualElementsWithSameDataSource();
+          }
+        }
+      } catch (error) {
+        console.error(`❌ [${item.i}] Error updating dynamic data:`, error);
+      }
+    }, [
+      // Watch for changes to the dynamic data - make it generic
+      (() => {
+        if (!item?.isVirtual || !resolvedAppStateData?.__dynamicDataKey) return null;
+        const dynamicDataKey = resolvedAppStateData.__dynamicDataKey;
+        
+        try {
+          if (typeof dynamicDataKey === 'string' && dynamicDataKey.includes('{{')) {
+            const path = dynamicDataKey.replace(/^\{\{state\./, '').replace(/\}\}$/, '');
+            const keys = path.split('.');
+            return keys.reduce((obj, key) => obj?.[key], appState);
+          } else if (dynamicDataKey) {
+            const keys = dynamicDataKey.replace(/^state\./, '').split('.');
+            return keys.reduce((obj, key) => obj?.[key], appState);
+          }
+        } catch (error) {
+          return null;
+        }
+        return null;
+      })(),
+      item?.i,
+      item?.isVirtual,
+      resolvedAppStateData?.__dynamicDataKey,
+      resolvedAppStateData?.__dynamicIndex,
+      setAppStatePartial,
+      dispatch,
+      allElements
+    ]);
+
+    // Create a hash of the resolved data to force re-renders when dynamic data changes
+    const dynamicDataHash = useMemo(() => {
+      if (item?.isVirtual && resolvedAppStateData?.__isVirtualElement && resolvedAppStateData?.__dynamicDataKey) {
+        try {
+          // Create a hash of the current dynamic data to detect changes
+          const dataToHash = {
+            ...resolvedAppStateData,
+            // Remove metadata from hash to focus on actual data
+            __dynamicIndex: undefined,
+            __dynamicDataKey: undefined,
+            __isVirtualElement: undefined,
+          };
+          const hash = JSON.stringify(dataToHash);
+          console.log(`🔄 [${item.i}] Dynamic data hash:`, hash.slice(0, 100) + '...');
+          return hash;
+        } catch (error) {
+          return Date.now().toString();
+        }
+      }
+      return null;
+    }, [resolvedAppStateData]);
+
     // Optimize configuration wit_overrh shallow comparison
     const itemConfiguration = useMemo(() => {
       const config = { ...item.configuration };
@@ -592,8 +931,11 @@ const ElementItem = React.memo(
         config.background = '';
       }
 
-      const stateConfig = appState?.[item.i] || {};
+      const stateConfig = resolvedAppStateData || {};
       let classNames = ` ${stateConfig.classNames || config.classNames}`.trim();
+      
+      // Debug state changes for loading-spinner and other key elements
+
 
       // Add pointer-events-none to text elements inside buttons (not in edit mode)
       if (item.componentId === 'text' && !editMode) {
@@ -610,12 +952,13 @@ const ElementItem = React.memo(
         ...stateConfig,
         classNames,
       };
-    }, [item.configuration, item.componentId, item.parent, appState?.[item.i], editMode, allElements]);
+    }, [item.configuration, item.componentId, item.parent, resolvedAppStateData, editMode, allElements]);
 
     // Optimize event handlers with better memoization
     const eventHandlers = useMemo(() => {
+
       if (editMode) return {};
-      
+      // message.info('eventHandlers')
       // Defensive check: only create event handlers if store is properly initialized
       if (!store?.dispatch) {
         console.warn('RenderElements: Store not fully initialized yet, skipping event handlers creation');
@@ -641,10 +984,10 @@ const ElementItem = React.memo(
         appState,
         createEventHandlers
       );
-    }, [
+   }, [
       editMode,
       item,
-      currentApplication?._id, // Only care about app ID changes, not the whole object
+      currentApplication?._id,
       navigate,
       params,
       tab,
@@ -653,64 +996,54 @@ const ElementItem = React.memo(
       setDestroyInfo,
       setAppStatePartial,
       storeInvocation,
-      item?.configuration?._overrides_,
-      JSON.stringify(item?.configuration?._overrides_),
+      stableOverrides,
       overridesRefreshKey,
-      eventHandlersRefreshKey, // Force refresh when editMode or tab changes
+      eventHandlersRefreshKey,
     ]);
+
 
     // Optimize cursor class generation
     const cursorClass = useMemo(() => {
+      let result = '';
+      
       // Remove !pointer-events-none as it prevents dragging
-      if (builderCursorMode === 'hand') return 'cursor-grab active:cursor-grabbing';
-      if (builderCursorMode === 'draw') return '!cursor-draw !disabled';
-      if (builderCursorMode === 'path') return 'cursor-path';
-      if (builderCursorMode === 'comment') return '!cursor-comment';
-      if (editMode && !isDrawingPathActive && builderCursorMode === 'default') {
-        return `${!isLayout ? 'cube' : ''} active:cursor-grabbing`;
+      if (builderCursorMode === 'hand') {
+        result = 'cursor-grab active:cursor-grabbing';
+      } else if (builderCursorMode === 'draw') {
+        result = '!cursor-draw !disabled';
+      } else if (builderCursorMode === 'path') {
+        result = 'cursor-path';
+      } else if (builderCursorMode === 'comment') {
+        result = '!cursor-comment';
+      } else if (editMode && !isDrawingPathActive && builderCursorMode === 'default') {
+        // Always add cube class for draggable elements in edit mode, regardless of isLayout
+        result = `cube active:cursor-grabbing`;
+      } else {
+        // Always add cube class for draggable elements when not in special modes
+        result = editMode ? 'cube' : '';
       }
-      return !isLayout ? 'cube' : '';
-    }, [builderCursorMode, editMode, isDrawingPathActive, isLayout]);
-
-    const renderItemWithData = useCallback(() => {
-      const viewTag = item.componentId === 'text' ? 'p' : item?.configuration?.tag || 'div';
-
-      const baseProps = {
-        key: item.i || index,
-        id: item.i || index,
-        'data-id': item.i || index, // For sortable detection
-        ...(item.componentId === 'text' || item.componentId === 'container' || item.componentId === 'icon'
-          ? { id: item.i || index }
-          : {}), // onMouseEnter: editMode && !readOnly ? () => setisHovered(true) : undefined,
-        // onMouseLeave: editMode && !readOnly ? () => setisHovered(false) : undefined,
-        onClick: (e) => {
-          e.stopPropagation();
-          if (item.componentId === 'drawpath' && isDrawingPathActive) {
-            setIsDrawingPathActive(false);
-          }
-          setCommentPos?.(e);
-        },
-        onDoubleClick: (e) => {
-          e.stopPropagation();
-          if (item.componentId === 'drawpath') {
-            setActiveDrawingPathId(item.i);
-            setIsDrawingPathActive(!isDrawingPathActive);
-            setSelectedElements([]);
-          }
-        },
-        style: processedStyle,
-        className: `${item?.isGroup ? 'group-container ' : ''}${twMerge(itemConfiguration?.classNames)} ${cursorClass}`,
-        ...eventHandlers,
-      };
-      const stateConfig = appState?.[item.i] || {};
       
-      // Process ALL dynamic properties globally (dynamicText, dynamicSrc, dynamicIcon, dynamicAlt, dynamicValue, etc.)
-      const resolvedDynamicProps = {};
+      // Debug cursor class (commented out to prevent re-renders)
+      // console.log('🎨 CURSOR CLASS:', {
+      //   elementId: item?.i,
+      //   builderCursorMode,
+      //   editMode,
+      //   isDrawingPathActive,
+      //   result,
+      //   hasCube: result.includes('cube'),
+      //   itemIsGroup: item?.isGroup,
+      //   itemComponentId: item?.componentId
+      // });
       
+      return result;
+    }, [builderCursorMode, editMode, isDrawingPathActive, item?.i]);
+
+    // Memoize dynamic props resolution to prevent infinite loops
+    const memoizedDynamicProps = useMemo(() => {
+      const props = {};
       
       // Find all dynamic properties in itemConfiguration
       for (const [key, value] of Object.entries(itemConfiguration || {})) {
-        
         if (key.startsWith('dynamic') && typeof value === 'string' && value.trim() !== '') {
           const basePropertyName = key.replace(/^dynamic/, '').toLowerCase();
           
@@ -730,11 +1063,9 @@ const ElementItem = React.memo(
               }
             );
             
-            
             // Only include if it resolved to a valid value
             if (resolvedValue !== null && resolvedValue !== undefined && resolvedValue !== '') {
-              resolvedDynamicProps[basePropertyName] = resolvedValue;
-            } else {
+              props[basePropertyName] = resolvedValue;
             }
           } catch (error) {
             console.warn('[RenderElements] Failed to resolve', key, ':', error);
@@ -742,68 +1073,48 @@ const ElementItem = React.memo(
         }
       }
       
-      
-      // Build the object to process
-      const objectToProcess = {
-        id: item.i,
-        ...flattenStyleObject(
-          {
-            ...baseProps,
-            ...itemConfiguration,
-            ...flattenStyleObject(item?.configuration, item?.style?.transform, editMode),
-            ...eventHandlers,
-            ...stateConfig,
-          },
-          item?.configuration?.transform,
-          editMode
-        ),
-        ...eventHandlers,
-      };
-      
-      // Apply all resolved dynamic properties to the object
-      Object.assign(objectToProcess, resolvedDynamicProps);
-      // message.info('objectToProcess:'+ JSON.stringify(objectToProcess.text));
-      const props = processObjectTemplatesAndReplace(
-        objectToProcess,
-        {
-          event: {},
-          globalObj: {},
-          paramState: params,
-          sessionKey: currentApplication?._id + '-sessionInfo',
-          store: store,
-        },
-        { element: item.i },
-        tab
-      );
-      if (editMode) {
-        delete props.disabled;
-        if (viewTag.toLowerCase() === 'button') {
-          props.type = 'button';
-        }
-      }
-      delete props.style.position;
-      delete props.style.transform;
-      
-      // Helper to get interpolated text
- 
-      // Optimize children rendering
-      const children = useMemo(() => {
+      return props;
+    }, [itemConfiguration, tab, currentApplication?._id, item?.i, store, resolvedAppStateData]);
+// consol
+// message.info('memoizedDynamicProps')
+if (item.i === 'loading-spinner' || item.i === 'todo-items-container') {
+  console.log(`🔍 [${item.i}] State Debug:`, {
+    appState: appState,
+    stateConfig: resolvedAppStateData,
+    // originalClassNames: config.classNames,
+    // finalClassNames: classNames,
+    // hasHidden: classNames.includes('hidden'),
+    timestamp: new Date().toISOString()
+  });
+}
+    // Move children memoization outside of the callback - now after resolvedDynamicProps
+    const children = useMemo(() => {
         // Built-in containers (container, slot, form) - just render children directly
         if ((item?.isGroup && (item.componentId === 'container' || item.componentId === 'form')) || item.componentId === 'slot') {
+          // Enter tracking for container/slot rendering
+          const childTracker = renderingTracker.enter(`${item.componentId}-${item.i}`);
           return (
-            <ElementRenderer allElements={allElements} parentId={item.i} isWrapper={false} renderingStack={renderingStack} />
+            <ElementRenderer
+              allElements={allElements}
+              parentId={item.i}
+              isWrapper={false}
+              renderingStack={renderingStack}
+              renderingTracker={childTracker}
+            />
           );
         }
 
         // Handle text component rendering
         if (item.componentId === 'text') {
-          // message.info('Rendering text component with value: ' + props.text);
-          return props.text || '';
+          // Get text from resolved dynamic props or configuration
+          const textValue = (memoizedDynamicProps as any).text || itemConfiguration?.text || '';
+          return textValue;
         }
 
         // Check if any element has text content in configuration (for anchor tags, buttons, etc.)
         if (item.configuration?.text && (item.componentId === 'container' || item.configuration?.tag)) {
-          return props.text || item.configuration.text || '';
+          const textValue = (memoizedDynamicProps as any).text || item.configuration.text || '';
+          return textValue;
         }
 
         // For all other components (including 3rd party containers), use renderComponent
@@ -818,7 +1129,7 @@ const ElementItem = React.memo(
                 paramState: params,
                 sessionKey: currentApplication?._id + '-sessionInfo',
                 // ...(appState?.[item.i] || {}),
-                props: appState?.[item.i] || {},
+                props: resolvedAppStateData || {},
 
                 store: store,
               },
@@ -832,6 +1143,17 @@ const ElementItem = React.memo(
             allComponentsRaw,
             processedStyle,
             renderChildren: (el) => {
+              // Check depth limit before rendering children
+              const childRenderCheck = renderingTracker.canRender(`renderChildren-${item.i}`, 'ref');
+              if (!childRenderCheck.allowed) {
+                console.warn(`[RenderElements] Skipping renderChildren for ${item.i}:`, childRenderCheck.reason);
+                return (
+                  <div className="border border-orange-400 bg-orange-50 p-2 text-xs text-orange-700">
+                    ⚠️ Children rendering depth limit reached
+                  </div>
+                );
+              }
+
               let childEls = [];
               if (el) {
                 // el is a string array of IDs, find the actual elements
@@ -881,7 +1203,9 @@ const ElementItem = React.memo(
                           })
                           .filter(Boolean);
                       }
-                    } catch (error) {}
+                    } catch (error) {
+                      // Handle JSON parse error silently
+                    }
                   }
                 }
 
@@ -906,10 +1230,11 @@ const ElementItem = React.memo(
                   parentId={item.i}
                   isWrapper={false}
                   renderingStack={renderingStack}
+                  renderingTracker={renderingTracker}
                 />
               );
             },
-            configuration: { ...item.configuration, ...(appState?.[item.i] || {}) },
+            configuration: { ...item.configuration, ...(resolvedAppStateData || {}) },
           },
           componentsMap,
           editMode,
@@ -941,10 +1266,120 @@ const ElementItem = React.memo(
         tab,
       ]);
 
-      // Handle component view with better recursion detection
+    const renderItemWithData = useCallback(() => {
+      // Add protection for virtual elements with circular refs or depth issues
+      if (item?.isVirtual) {
+        const virtualCheck = renderingTracker.canRender(`virtual-${item.i}`, 'virtual');
+        if (!virtualCheck.allowed) {
+          console.warn(`[RenderElements] Virtual element blocked: ${item.i}`, virtualCheck);
+          return (
+            <div className="border border-purple-400 bg-purple-50 p-2 text-xs text-purple-700">
+              ⚠️ Virtual element: {item.name || item.i}
+              <div className="mt-1 text-purple-500 text-[10px]">
+                {virtualCheck.reason}
+              </div>
+            </div>
+          );
+        }
+      }
+
+      const viewTag = item.componentId === 'text' ? 'p' : item?.configuration?.tag || 'div';
+
+      const baseProps = {
+        key: item.i || index,
+        id: item.i || index,
+        'data-id': item.i || index,
+        ...(item.componentId === 'text' || item.componentId === 'container' || item.componentId === 'icon'
+          ? { id: item.i || index }
+          : {}),
+        onDoubleClick: (e) => {
+          e.stopPropagation();
+          if (item.componentId === 'drawpath') {
+            setActiveDrawingPathId(item.i);
+            setIsDrawingPathActive(!isDrawingPathActive);
+            setSelectedElements([]);
+          }
+        },
+        style: processedStyle,
+        className: `${item?.isGroup ? 'group-container ' : ''}${twMerge(itemConfiguration?.classNames)} ${cursorClass}`,
+        ...eventHandlers,
+      };
+      
+      const stateConfig = resolvedAppStateData || {};
+      
+      // Build the object to process
+      const objectToProcess = {
+        id: item.i,
+        ...flattenStyleObject(
+          {
+            ...baseProps,
+            ...itemConfiguration,
+            ...flattenStyleObject(item?.configuration, item?.style?.transform, editMode),
+            ...eventHandlers,
+            ...stateConfig,
+          },
+          item?.configuration?.transform,
+          editMode
+        ),
+        ...eventHandlers,
+      };
+      console.log(item.i,'objectToProcess', objectToProcess)
+      // Apply all resolved dynamic properties to the object
+      Object.assign(objectToProcess, memoizedDynamicProps);
+      
+      const props = processObjectTemplatesAndReplace(
+        objectToProcess,
+        {
+          event: {},
+          globalObj: {},
+          paramState: params,
+          sessionKey: currentApplication?._id + '-sessionInfo',
+          store: store,
+        },
+        { element: item.i },
+        tab
+      );
+      
+      if (editMode) {
+        delete props.disabled;
+        if (viewTag.toLowerCase() === 'button') {
+          props.type = 'button';
+        }
+      }
+      delete props.style.position;
+      delete props.style.transform;
+
+      // Handle component view with enhanced recursion detection
       if (item.isComponentView) {
         const componentViewId = `${item.componentId}-${item.i}`;
 
+        // Use enhanced rendering tracker for better circular reference detection
+        const renderCheck = renderingTracker.canRender(componentViewId, 'component');
+        if (!renderCheck.allowed) {
+          console.error(`[RenderElements] Component view blocked: ${componentViewId}`, {
+            reason: renderCheck.reason,
+            depth: renderingTracker.getDepth(),
+            path: renderingTracker.getPath(),
+          });
+          return (
+            <div className="border-2 border-red-500 border-dashed p-4 bg-red-50" style={processedStyle}>
+              <p className="text-red-600 text-sm font-semibold">⚠️ {renderCheck.reason}</p>
+              <p className="text-red-500 text-xs mt-2">Component: {item.componentId}</p>
+              <p className="text-red-500 text-xs">
+                Depth: {renderingTracker.getDepth()}
+                {renderingTracker.getDepth() >= MAX_NESTING_DEPTH && ` (Browser limit reached)`}
+              </p>
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer text-red-600 hover:text-red-800">View rendering path</summary>
+                <pre className="mt-1 p-2 bg-red-100 rounded text-xs overflow-auto max-h-32">
+                  {renderingTracker.getPath().join('\n  → ')}
+                </pre>
+              </details>
+            </div>
+          );
+        }
+
+        // Legacy check for backward compatibility
         if (renderingStack.has(componentViewId)) {
           return (
             <div className="border-2 border-red-500 border-dashed p-4 bg-red-50" style={processedStyle}>
@@ -974,16 +1409,19 @@ const ElementItem = React.memo(
           ensureChildrenInGlobalElements(viewElements?.filter((it) => it.parent));
         }
 
+        // Create new tracking instances for child rendering
         const newRenderingStack = new Set(renderingStack);
         newRenderingStack.add(componentViewId);
+        const newRenderingTracker = renderingTracker.enter(componentViewId);
 
         return (
-          <div id={item.i}>
+          <div id={item.i} data-depth={renderingTracker.getDepth()} data-component-view={componentViewId}>
             <ElementRenderer
               allElements={allElements}
               parentId={item.i}
               isWrapper={false}
               renderingStack={newRenderingStack}
+              renderingTracker={newRenderingTracker}
             />
           </div>
         );
@@ -1050,7 +1488,8 @@ const ElementItem = React.memo(
             );
           } catch (error) {
             console.warn('[RenderElements] Failed to process children classNames:', error);
-            childrenClassNames = itemConfiguration?.classNames || ''; // Fallback to original
+            // Fallback to original
+            childrenClassNames = itemConfiguration?.classNames || '';
           }
         }
         
@@ -1078,34 +1517,59 @@ const ElementItem = React.memo(
           );
         } catch (error) {
           console.warn('[RenderElements] Failed to process classNames:', error);
-          processedClassNames = classNames; // Fallback to original
+          // Fallback to original
+          processedClassNames = classNames;
         }
       }
       
       const content = React.createElement(viewTag, { ...restProps, className: processedClassNames }, children);
 
+      // Check if this element is selected
+      const isElementSelected = targets?.some(t => t.id === item.i) || false;
+
+      // Check if element has children or is self-closing
+      const elementHasChildren = children && React.Children.count(children) > 0;
+      const isSelfClosingTag = SELF_CLOSING_TAGS.has(viewTag.toLowerCase());
+
+      // Wrap with SpacingOverlay if in edit mode
+      const wrappedContent = editMode ? (
+        <SpacingOverlay
+          enabled={editMode && builderCursorMode === 'default'}
+          elementId={item.i || String(index)}
+          tagName={viewTag}
+          isSelected={isElementSelected}
+          scale={scale || 1}
+          containerRef={containerRef}
+          isSelfClosing={isSelfClosingTag}
+          hasChildren={elementHasChildren}
+          isMoving={isMoving}
+        >
+          {content}
+        </SpacingOverlay>
+      ) : content;
+
       // Wrap with sortable if needed
-      if (shouldUseSortable && !item.parent) {
+      if ( !item.parent) {
         // Only sortable for root level items for now
         return (
-          <SimpleSortableItem id={item.i}>
+          <>
             {item?.isVirtual ? (
               <VirtualElementWrapper editMode={editMode} style={processedStyle}>
-                {content}
+                {wrappedContent}
               </VirtualElementWrapper>
             ) : (
-              content
+              wrappedContent
             )}
-          </SimpleSortableItem>
+          </>
         );
       }
 
       return item?.isVirtual ? (
         <VirtualElementWrapper editMode={editMode} style={processedStyle}>
-          {content}
+          {wrappedContent}
         </VirtualElementWrapper>
       ) : (
-        content
+        wrappedContent
       );
     }, [
       item,
@@ -1134,7 +1598,10 @@ const ElementItem = React.memo(
       store,
       tab,
       shouldUseSortable,
-      appState, // Add appState to trigger re-render when state changes
+      appState,
+      memoizedDynamicProps,
+      children,
+      dynamicDataHash,
     ]);
 
     return renderItemWithData();
@@ -1142,16 +1609,14 @@ const ElementItem = React.memo(
   (prevProps, nextProps) => {
     // CRITICAL: During sortable operations, always skip re-render
     if (isSortableCurrentlyActive()) {
-      return true; // Return true to prevent re-render
+      // Return true to prevent re-render
+      return true;
     }
 
-    // Custom comparison for better memoization
-    return (
-      prevProps.item === nextProps.item &&
-      prevProps.index === nextProps.index &&
-      prevProps.allElements === nextProps.allElements &&
-      prevProps.renderingStack === nextProps.renderingStack
-    );
+    // Always allow re-renders for now to fix state update issues
+    // TODO: Optimize this later with proper context-aware comparison
+    // Always re-render
+    return false;
   }
 );
 
@@ -1160,16 +1625,18 @@ interface ElementRendererProps {
   parentId?: string | null;
   isWrapper?: boolean;
   renderingStack?: Set<any>;
+  renderingTracker?: RenderingTracker;
 }
 const ElementRenderer = React.memo(
-  ({ allElements, parentId = null, isWrapper = false, renderingStack = new Set() }: ElementRendererProps) => {
-    const { editMode, currentApplication, tab, readOnly, setElements } = useElementRenderer();
+  ({ allElements, parentId = null, isWrapper = false, renderingStack = new Set(), renderingTracker = new RenderingTracker() }: ElementRendererProps) => {
+    const { editMode, currentApplication, tab, readOnly, setElements, appState } = useElementRenderer();
 
     const [currentTab, setCurrentTab] = useState(tab);
     const [isClearing, setIsClearing] = useState(false);
 
     // Log when render is attempted during sorting
     if (isSortableCurrentlyActive()) {
+      // Sorting is active - render will be skipped
     }
 
     // Optimize tab change with better batching - avoid conflicts with SortableJS
@@ -1222,9 +1689,30 @@ const ElementRenderer = React.memo(
       for (const [id, item] of elementMap) {
         if (item.parent === parentId && item.i) {
           if (item.isVirtual && item.sourceTab && item.sourceTab !== tab) {
+            // Debug virtual element filtering
+            if (item.i === 'loading-spinner' || item.i === 'todo-items-container') {
+              console.log(`🚫 FILTERED OUT [${item.i}]:`, {
+                isVirtual: item.isVirtual,
+                sourceTab: item.sourceTab,
+                currentTab: tab,
+                parent: item.parent,
+                parentId: parentId
+              });
+            }
             continue;
           }
           filtered.push(item);
+          
+          // Debug what gets rendered
+          if (item.i === 'loading-spinner' || item.i === 'todo-items-container') {
+            console.log(`✅ RENDERED [${item.i}]:`, {
+              isVirtual: item.isVirtual,
+              sourceTab: item.sourceTab,
+              currentTab: tab,
+              parent: item.parent,
+              parentId: parentId
+            });
+          }
         }
       }
       const handleDOMError = () => {
@@ -1239,16 +1727,25 @@ const ElementRenderer = React.memo(
           key={`${item.i}-${tab}-${item.isVirtual ? 'v' : 'n'}`}
           fallback={<p>Error</p>}
           onDOMError={handleDOMError}
+          elementId={item.i}
+          depth={renderingTracker?.getDepth()}
+          renderPath={renderingTracker?.getPath()}
         >
           <DebugWrapper
             element={item}
             enabled={editMode && currentApplication?.builderSettings?.anatomy}
           >
-            <ElementItem item={item} index={index} allElements={allElements} renderingStack={renderingStack} />
+            <ElementItem
+              item={item}
+              index={index}
+              allElements={allElements}
+              renderingStack={renderingStack}
+              renderingTracker={renderingTracker}
+            />
           </DebugWrapper>
         </ErrorBoundary>
       ));
-    }, [allElements, parentId, tab, isClearing, renderingStack, editMode, currentApplication?.builderSettings?.anatomy]);
+    }, [allElements, parentId, tab, isClearing, renderingStack, editMode, currentApplication?.builderSettings?.anatomy, appState]);
 
     return <>{filteredElements}</>;
   }
@@ -1261,6 +1758,20 @@ interface ElementRendererWithContextProps {
   isWrapper?: boolean;
   tab?: string;
   editMode?: boolean;
+  setIsDragging?: (isDragging: boolean) => void;
+  setSelectedTargets?: (targets: any[]) => void;
+  appState?: any;
+  dispatch?: any;
+  store?: any;
+  navigate?: any;
+  params?: any;
+  currentApplication?: any;
+  setAppStatePartial?: any;
+  refreshAppAuth?: any;
+  setDestroyInfo?: any;
+  setSessionInfo?: any;
+  storeInvocation?: any;
+  allComponentsRaw?: any;
 }
 
 const ElementRendererWithContext = React.memo((props: ElementRendererWithContextProps) => {
@@ -1378,14 +1889,28 @@ const ElementRendererWithContext = React.memo((props: ElementRendererWithContext
     return sortElementsHierarchically(elementsWithSlotMapping);
   }, [props.elements, props.tab, isSortingActive]); // Include isSortingActive in dependencies
 
+  // Force re-render when appState changes by using a hash
+  const appStateHash = useMemo(() => {
+    return JSON.stringify(props.appState || {}).slice(0, 100);
+  }, [props.appState]);
+
+  // Debug scale changes
+  useEffect(() => {
+    console.log('🔍 ElementRendererWithContext - scale prop changed to:', props.scale);
+  }, [props.scale]);
+
   // Deep memo for context value to prevent unnecessary re-renders
   const contextValue = useMemo(
-    () => ({
-      ...props,
-      elements: cleanedElements,
-      setElements: props.setElements,
-    }),
-    [props, cleanedElements]
+    () => {
+      console.log('🔍 Creating new context value with scale:', props.scale);
+      return {
+        ...props,
+        elements: cleanedElements,
+        setElements: props.setElements,
+        appStateHash, // Include hash to force updates
+      };
+    },
+    [props, cleanedElements, props.appState, appStateHash, props.scale]
   );
 
   // Toggle to use DndKit instead of SortableJS
@@ -1402,8 +1927,16 @@ const ElementRendererWithContext = React.memo((props: ElementRendererWithContext
 
   return (
     <ElementRendererContext.Provider value={contextValue}>
-      {/* <SortableContainerSetup elements={cleanedElements} setElements={props.setElements} /> */}
-      {props.editMode && useDndKit ? (
+     {props.editMode &&     <SortableContainerSetup 
+        elementss={cleanedElements} 
+        setElements={props.setElements}
+        setSortableOperationState={setSortableOperationState}
+        isSortableCurrentlyActive={isSortableCurrentlyActive}
+        setIsDragging={props.setIsDragging}
+        setSelectedTargets={props.setSelectedTargets}
+      />}
+
+      {props.editMode ? (
         elementRenderer
       ) : (
         // <SimpleDndKit
