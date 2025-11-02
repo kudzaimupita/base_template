@@ -28,7 +28,7 @@ env:
   SITE_URL: ${{ github.event.inputs.site_url }}
   AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
   BUILD_DIR: dist
-  WEBHOOK_URL: ${{ secrets.DEPLOYMENT_WEBHOOK_URL }}
+  WEBHOOK_URL: https://core-api.servly.app/webhooks/callback
 
 permissions:
   contents: read
