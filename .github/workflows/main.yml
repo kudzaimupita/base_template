@@ -25,15 +25,41 @@ env:
   S3_BUCKET: ${{ github.event.inputs.s3_bucket }}
   VERSION: ${{ github.event.inputs.version }}
   SITE_URL: ${{ github.event.inputs.site_url }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Show dispatch details
+      - name: Show dispatch inputs
         run: |
           echo "deployment_id=$DEPLOYMENT_ID"
           echo "app_id=$APP_ID"
           echo "s3_bucket=$S3_BUCKET"
           echo "version=$VERSION"
           echo "site_url=$SITE_URL"
+
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show dispatch inputs
+        run: |
+          echo "deployment_id=$DEPLOYMENT_ID"
+          echo "app_id=$APP_ID"
+          echo "s3_bucket=$S3_BUCKET"
+          echo "version=$VERSION"
+          echo "site_url=$SITE_URL"
+
+      - name: Configure AWS credentials (OIDC)
+        if: secrets.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (keys fallback)
+        if: secrets.AWS_ROLE_TO_ASSUME == ''
+        run: |
+          aws configure set aws_access_key_id "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws configure set aws_secret_access_key "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          aws configure set default.region "${{ env.AWS_REGION }}"
