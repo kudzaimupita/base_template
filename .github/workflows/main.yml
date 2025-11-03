@@ -108,7 +108,7 @@ jobs:
           if [ -n "$VERSION" ]; then
             PAYLOAD="$PAYLOAD,\"version\":\"$VERSION\""
           fi
-          if [ -n "$SITE_URL\" ]; then
+          if [ -n "$SITE_URL" ]; then
             PAYLOAD="$PAYLOAD,\"siteUrl\":\"$SITE_URL\""
           fi
           PAYLOAD="$PAYLOAD}"
