@@ -1,93 +1,67 @@
-name: Deploy Static Application
+name: Deploy to GitHub Pages
 
 on:
   workflow_dispatch:
     inputs:
       deployment_id:
-        description: Deployment document identifier
+        description: Tracking identifier (unused)
         required: true
       app_id:
-        description: Application identifier
+        description: Tracking identifier (unused)
         required: true
-      s3_bucket:
-        description: Target S3 bucket name
-        required: true
-      version:
-        description: Application version being deployed
-        required: true
-      aws_region:
-        description: AWS region (defaults to us-east-1)
-        required: false
 
 permissions:
   contents: read
+  pages: write
   id-token: write
 
-env:
-  DEPLOYMENT_ID: ${{ github.event.inputs.deployment_id }}
-  APP_ID: ${{ github.event.inputs.app_id }}
-  S3_BUCKET: ${{ github.event.inputs.s3_bucket }}
-  VERSION: ${{ github.event.inputs.version }}
-  WEBHOOK_URL: ${{ secrets.DEPLOYMENT_WEBHOOK_URL }}
-  BUILD_DIR: dist
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Notify workflow queued
-        if: ${{ env.WEBHOOK_URL != '' }}
-        run: |
-          curl -sS -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            --data "{\"status\":\"queued\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}"
-
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install dependencies
+        run: npm install --force
+
+      - name: Build project
+        run: npm run build --if-present
+
+      - name: Prepare GitHub Pages artifact
         run: |
-          if [ -n "$WEBHOOK_URL" ]; then
-            curl -sS -X POST "$WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              --data "{\"status\":\"install_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          rm -rf deploy-root
+          mkdir -p deploy-root
+          if [ -d dist ]; then
+            cp -a dist/. deploy-root/
+          else
+            echo "dist directory not found; creating placeholder index.html";
+            echo "<html><body><h1>No build output</h1></body></html>" > deploy-root/index.html;
           fi
-          npm install --force
 
-      - name: Build application
-        run: |
-          if [ -n "$WEBHOOK_URL" ]; then
-            curl -sS -X POST "$WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              --data "{\"status\":\"build_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
-          fi
-          npm run build
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: deploy-root
 
-      - name: Post-build processing
-        run: |
-          if [ -n "$WEBHOOK_URL" ]; then
-            curl -sS -X POST "$WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              --data "{\"status\":\"post_build_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
-          fi
-          echo "Skipping AWS deployment steps for now."
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy-pages.outputs.page_url }}
 
-      - name: Notify completion
-        if: ${{ env.WEBHOOK_URL != '' }}
-        run: |
-          curl -sS -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            --data "{\"status\":\"complete\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\",\"s3Bucket\":\"$S3_BUCKET\",\"version\":\"$VERSION\"}"
-
-      - name: Notify failure
-        if: ${{ failure() && env.WEBHOOK_URL != '' }}
-        run: |
-          curl -sS -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            --data "{\"status\":\"failed\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\",\"error\":\"see workflow logs\"}"
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy-pages
+        uses: actions/deploy-pages@v4
