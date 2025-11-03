@@ -50,11 +50,12 @@ jobs:
             --data "{\"status\":\"queued\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}"
 
       - name: Configure AWS credentials
+        if: secrets.AWS_ROLE_TO_ASSUME != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-        if: secrets.AWS_ROLE_TO_ASSUME != ''
+
       - name: Configure AWS credentials (keys fallback)
         if: secrets.AWS_ROLE_TO_ASSUME == ''
         run: |
