@@ -1,82 +1,113 @@
-name: Deploy static app to GitHub Pages
+name: Deploy Static Application
 
 on:
   workflow_dispatch:
     inputs:
       deployment_id:
-        description: Mongo deployment document id
+        description: Deployment document identifier
         required: true
       app_id:
-        description: App id the API sent
+        description: Application identifier
         required: true
       s3_bucket:
-        description: Ignored in this workflow (kept for API compatibility)
+        description: Target S3 bucket name
         required: true
       version:
-        description: Optional version label
+        description: Application version being deployed
+        required: true
+      aws_region:
+        description: AWS region (defaults to us-east-1)
         required: false
-      site_url:
-        description: Optional explicit site URL (unused in this workflow)
-        required: false
+
+permissions:
+  contents: read
+  id-token: write
 
 env:
   DEPLOYMENT_ID: ${{ github.event.inputs.deployment_id }}
   APP_ID: ${{ github.event.inputs.app_id }}
+  S3_BUCKET: ${{ github.event.inputs.s3_bucket }}
   VERSION: ${{ github.event.inputs.version }}
+  AWS_REGION: ${{ github.event.inputs.aws_region || vars.AWS_REGION || 'us-east-1' }}
+  WEBHOOK_URL: ${{ secrets.DEPLOYMENT_WEBHOOK_URL }}
+  CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
   BUILD_DIR: dist
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Notify workflow queued
+        if: env.WEBHOOK_URL != ''
+        run: |
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"status\":\"queued\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}"
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci --force
-
-      - name: Build
-        run: npm run build
-
-      - name: Prepare Pages artifact
-        run: |
-          rm -rf deploy-root
-          mkdir -p deploy-root/$APP_ID
-          cp -a "$BUILD_DIR"/. "deploy-root/$APP_ID/"
-
-          cat <<EOF > deploy-root/$APP_ID/deployment.json
-          {
-            "deploymentId": "${DEPLOYMENT_ID}",
-            "appId": "${APP_ID}",
-            "version": "${VERSION:-latest}",
-            "builtAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          }
-          EOF
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          path: deploy-root
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      - name: Install dependencies
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sS -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "{\"status\":\"install_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          fi
+          npm install --force
 
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Build application
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sS -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "{\"status\":\"build_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          fi
+          npm run build
+
+      - name: Post-build processing
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sS -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "{\"status\":\"post_build_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          fi
+
+      - name: Upload artifacts to S3
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sS -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "{\"status\":\"uploading_artifacts\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          fi
+          aws s3 sync "$BUILD_DIR" "s3://$S3_BUCKET" --delete
+
+      - name: Invalidate CloudFront cache
+        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths '/*'
+
+      - name: Notify completion
+        if: env.WEBHOOK_URL != ''
+        run: |
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"status\":\"complete\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\",\"s3Bucket\":\"$S3_BUCKET\",\"version\":\"$VERSION\"}"
+
+      - name: Notify failure
+        if: failure() && env.WEBHOOK_URL != ''
+        run: |
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"status\":\"failed\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\",\"error\":\"see workflow logs\"}"
