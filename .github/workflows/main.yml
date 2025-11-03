@@ -1,25 +1,124 @@
-name: Dispatch Smoke Test
+name: Deploy static app
 
 on:
   workflow_dispatch:
     inputs:
       deployment_id:
-        required: false
+        description: Mongo deployment document id
+        required: true
       app_id:
-        required: false
+        description: App id the API sent
+        required: true
       s3_bucket:
-        required: false
+        description: Target S3 bucket (must exist)
+        required: true
       version:
+        description: Optional version label
         required: false
       site_url:
+        description: Optional explicit site URL to return
         required: false
 
+env:
+  DEPLOYMENT_ID: ${{ github.event.inputs.deployment_id }}
+  APP_ID: ${{ github.event.inputs.app_id }}
+  S3_BUCKET: ${{ github.event.inputs.s3_bucket }}
+  VERSION: ${{ github.event.inputs.version }}
+  SITE_URL: ${{ github.event.inputs.site_url }}
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+  BUILD_DIR: dist
+  WEBHOOK_URL: https://core-api.servly.app/webhooks/callback
+
+permissions:
+  contents: read
+  id-token: write   # needed when using OIDC to assume an AWS role
+
 jobs:
-  hello:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Show info
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Notify queued
+        if: env.WEBHOOK_URL != ''
         run: |
-          echo "Workflow dispatched at $(date -u)"
-          echo "Triggered by: ${{ github.actor }}"
-          echo "Input note: ${{ github.event.inputs.note || '—' }}"
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"status\":\"queued\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}"
+
+      - name: Configure AWS credentials (OIDC)
+        if: secrets.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (keys fallback)
+        if: secrets.AWS_ROLE_TO_ASSUME == ''
+        run: |
+          aws configure set aws_access_key_id "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws configure set aws_secret_access_key "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          aws configure set default.region "${{ env.AWS_REGION }}"
+
+      - name: Node.js setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sS -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "{\"status\":\"install_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          fi
+          npm ci
+
+      - name: Build
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sS -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "{\"status\":\"build_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          fi
+          npm run build
+
+      - name: Post-build
+        if: env.WEBHOOK_URL != ''
+        run: |
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"status\":\"post_build_started\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}"
+
+      - name: Upload to S3
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sS -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "{\"status\":\"uploading_artifacts\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\"}";
+          fi
+          aws s3 sync "$BUILD_DIR" "s3://$S3_BUCKET" --delete
+
+      - name: Notify success
+        if: success() && env.WEBHOOK_URL != ''
+        run: |
+          PAYLOAD="{\"status\":\"complete\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\",\"s3Bucket\":\"$S3_BUCKET\""
+          if [ -n "$VERSION" ]; then
+            PAYLOAD="$PAYLOAD,\"version\":\"$VERSION\""
+          fi
+          if [ -n "$SITE_URL" ]; then
+            PAYLOAD="$PAYLOAD,\"siteUrl\":\"$SITE_URL\""
+          fi
+          PAYLOAD="$PAYLOAD}"
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD"
+
+      - name: Notify failure
+        if: failure() && env.WEBHOOK_URL != ''
+        run: |
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "{\"status\":\"failed\",\"deploymentId\":\"$DEPLOYMENT_ID\",\"appId\":\"$APP_ID\",\"error\":\"see GitHub Actions logs\"}"
