@@ -3,8 +3,15 @@ name: Dispatch Smoke Test
 on:
   workflow_dispatch:
     inputs:
-      note:
-        description: Optional message to log
+      deployment_id:
+        required: false
+      app_id:
+        required: false
+      s3_bucket:
+        required: false
+      version:
+        required: false
+      site_url:
         required: false
 
 jobs:
